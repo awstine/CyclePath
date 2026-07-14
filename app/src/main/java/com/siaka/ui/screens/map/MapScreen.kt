@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -16,40 +15,35 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -57,6 +51,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,7 +59,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -74,17 +71,20 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
+import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
-import com.mapbox.maps.extension.compose.annotation.generated.PolylineAnnotation
 import com.mapbox.maps.extension.compose.annotation.ViewAnnotation
+import com.mapbox.maps.extension.compose.annotation.generated.PolylineAnnotation
 import com.mapbox.maps.viewannotation.geometry
 import com.mapbox.maps.viewannotation.viewAnnotationOptions
+import com.siaka.R
+import com.siaka.data.LocationPoint
 import com.siaka.data.MapUiState
 import com.siaka.ui.theme.DangerRed
 import com.siaka.ui.theme.DarkNavy
-import com.siaka.ui.theme.NavigationGreen
+import com.siaka.ui.theme.PrimaryDark
 import com.siaka.ui.theme.SiakaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,7 +120,7 @@ fun MapScreen(
         }
     }
 
-    // Handle back-button to exit navigation safely
+    // Handle back-button to exit
     BackHandler(enabled = uiState.isNavigating || uiState.isRouteGenerated) {
         if (uiState.isNavigating) {
             viewModel.stopNavigation()
@@ -138,10 +138,14 @@ fun MapScreen(
         onClearRoute = viewModel::clearRoute,
         onGenerateRoute = viewModel::generateRoute,
         onStartNavigation = viewModel::startNavigation,
-        onSaveRoute = viewModel::saveRoute,
+        onSaveRoute = viewModel::onShowSaveRouteDialog,
+        onConfirmSaveRoute = viewModel::saveRoute,
+        onDismissSaveRoute = viewModel::onDismissSaveRouteDialog,
+        onRouteNameChange = viewModel::onRouteNameInputChange,
         onDistanceInputChange = viewModel::onDistanceInputChange,
         onShowDistanceDialog = viewModel::onShowDistanceDialog,
-        onDismissDistanceDialog = viewModel::onDismissDistanceDialog
+        onDismissDistanceDialog = viewModel::onDismissDistanceDialog,
+        onSnackbarDismissed = viewModel::onSnackbarDismissed
     )
 }
 
@@ -157,14 +161,27 @@ fun MapScreenContent(
     onGenerateRoute: () -> Unit,
     onStartNavigation: () -> Unit,
     onSaveRoute: () -> Unit,
+    onConfirmSaveRoute: () -> Unit,
+    onDismissSaveRoute: () -> Unit,
+    onRouteNameChange: (String) -> Unit,
     onDistanceInputChange: (String) -> Unit,
     onShowDistanceDialog: () -> Unit,
-    onDismissDistanceDialog: () -> Unit
+    onDismissDistanceDialog: () -> Unit,
+    onSnackbarDismissed: () -> Unit
 ) {
     val viewportState = rememberMapViewportState {
         setCameraOptions {
             zoom(12.0)
             center(Point.fromLngLat(36.817223, -1.286389))
+        }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onSnackbarDismissed()
         }
     }
 
@@ -194,34 +211,29 @@ fun MapScreenContent(
                 points,
                 coordinatesPadding = EdgeInsets(100.0, 100.0, 600.0, 100.0) // Extra padding at bottom for UI
             )
+            // Use setCameraOptions for immediate positioning if it's the first time
+            viewportState.setCameraOptions(cameraOptions)
+            // Also flyTo for a smooth transition if points change later
             viewportState.flyTo(cameraOptions)
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (!uiState.isNavigating) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "Siaka",
-                            color = DarkNavy,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-                )
-            }
-        },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (!uiState.isNavigating) {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Siaka",
+                        color = PrimaryDark,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
             // 1. Map Layer
             if (uiState.isLocationPermissionGranted) {
                 MapboxMap(
@@ -258,11 +270,13 @@ fun MapScreenContent(
             }
 
             // 2. Top Navigation Banner (Turn-by-Turn)
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = uiState.isNavigating,
                 enter = slideInVertically(initialOffsetY = { -it }),
                 exit = slideOutVertically(targetOffsetY = { -it }),
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
             ) {
                 NavigationTopBanner(
                     instruction = uiState.nextInstruction,
@@ -271,9 +285,12 @@ fun MapScreenContent(
             }
 
             // 3. Search Bar (When Idle)
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = !uiState.isNavigating && !uiState.isRouteGenerated,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 16.dp)
             ) {
                 SearchBarOverlay(onClick = onShowDistanceDialog)
             }
@@ -285,7 +302,7 @@ fun MapScreenContent(
                     .padding(end = 16.dp, bottom = if (uiState.isNavigating) 140.dp else 0.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                MapControlCircleButton(Icons.Default.Add) {;
+                MapControlCircleButton(R.drawable.zoom_in) {
                     viewportState.cameraState?.let {
                         viewportState.flyTo(
                             com.mapbox.maps.CameraOptions.Builder()
@@ -294,16 +311,16 @@ fun MapScreenContent(
                         )
                     }
                 }
-                MapControlCircleButton(Icons.Default.Remove) {
+                MapControlCircleButton(R.drawable.zoom_out) {
                     viewportState.cameraState?.let {
                         viewportState.flyTo(
-                            com.mapbox.maps.CameraOptions.Builder()
+                            CameraOptions.Builder()
                                 .zoom(it.zoom - 1.0)
                                 .build()
                         )
                     }
                 }
-                MapControlCircleButton(Icons.Default.MyLocation) { onCenterOnLocationRequested() }
+                MapControlCircleButton(R.drawable.gps) { onCenterOnLocationRequested() }
             }
 
             // 5. Bottom Controls (Route Actions OR Navigation Details)
@@ -311,9 +328,10 @@ fun MapScreenContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .padding(bottom = 90.dp) // Lift above NavigationBar
             ) {
                 // State: Route has been generated but not started
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = uiState.isRouteGenerated && !uiState.isNavigating,
                     enter = slideInVertically(initialOffsetY = { it }),
                     exit = slideOutVertically(targetOffsetY = { it })
@@ -321,43 +339,55 @@ fun MapScreenContent(
                     RouteActionButtons(
                         onRegenerate = onShowDistanceDialog,
                         onStart = onStartNavigation,
-                        onSave = onSaveRoute
+                        onSave = onSaveRoute,
+                        onClose = onClearRoute
                     )
                 }
 
                 // State: Actively Navigating
-                AnimatedVisibility(
-                    visible = uiState.isNavigating,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it })
-                ) {
-                    Box(
+                if (uiState.isNavigating) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 24.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(bottom = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            onClick = onStopNavigation,
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                            modifier = Modifier
-                                .height(56.dp)
-                                .shadow(8.dp, RoundedCornerShape(50)),
-                            contentPadding = PaddingValues(horizontal = 32.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "End Navigation",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
+                            // End Navigation Button (Primary)
+                            Button(
+                                onClick = onStopNavigation,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .shadow(8.dp, RoundedCornerShape(16.dp)),
+                                contentPadding = PaddingValues(horizontal = 16.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "End Navigation",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
+            
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
 
         if (uiState.showDistanceDialog) {
@@ -366,6 +396,16 @@ fun MapScreenContent(
                 onDistanceChange = onDistanceInputChange,
                 onConfirm = onGenerateRoute,
                 onDismiss = onDismissDistanceDialog
+            )
+        }
+
+        if (uiState.showSaveRouteDialog) {
+            SaveRouteDialog(
+                routeName = uiState.routeNameInput,
+                onRouteNameChange = onRouteNameChange,
+                onConfirm = onConfirmSaveRoute,
+                onDismiss = onDismissSaveRoute,
+                isSaving = uiState.isSaving
             )
         }
     }
@@ -403,7 +443,7 @@ fun UserLocationMarker(isNavigating: Boolean, bearing: Float = 0f) {
                 .shadow(4.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Color(0xFF2196F3))
-                .border(3.dp, Color.White, CircleShape)
+                .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape)
         )
     }
 }
@@ -417,17 +457,25 @@ fun SearchBarOverlay(onClick: () -> Unit) {
             .fillMaxWidth()
             .height(56.dp),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
+            Icon(
+                painter = painterResource(R.drawable.search),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Enter loop distance (km)...", color = Color.Gray, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Gray)
+            Text(
+                "Enter loop distance (km)...",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -439,7 +487,7 @@ fun NavigationTopBanner(instruction: String, distance: Int) {
             .padding(12.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = NavigationGreen),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Row(
@@ -450,13 +498,13 @@ fun NavigationTopBanner(instruction: String, distance: Int) {
             Surface(
                 modifier = Modifier.size(64.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.25f)
+                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.25f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.TurnRight,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSecondary,
                         modifier = Modifier.size(40.dp)
                     )
                 }
@@ -465,25 +513,22 @@ fun NavigationTopBanner(instruction: String, distance: Int) {
             Column {
                 Text(
                     text = instruction.ifEmpty { "Proceed on route" },
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondary,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     lineHeight = 24.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "$distance",
-                        color = Color.White,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.ExtraBold)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "M",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
@@ -496,30 +541,45 @@ fun NavigationTopBanner(instruction: String, distance: Int) {
 fun RouteActionButtons(
     onRegenerate: () -> Unit,
     onStart: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    onClose: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 16.dp
     ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Drag handle
-            Box(
+        Box(modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.material3.IconButton(
+                onClick = onClose,
                 modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray)
-            )
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Drag handle
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
 
             // Start Navigation (Primary Focus)
             Button(
@@ -528,11 +588,11 @@ fun RouteActionButtons(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = DarkNavy)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Start Navigation", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Start Navigation", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onPrimary)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -548,9 +608,9 @@ fun RouteActionButtons(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = DarkNavy)
+                    Icon(Icons.Default.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Regenerate", color = DarkNavy, fontWeight = FontWeight.SemiBold)
+                    Text("Regenerate", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -562,26 +622,32 @@ fun RouteActionButtons(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.BookmarkBorder, contentDescription = null, tint = DarkNavy)
+                    Icon(Icons.Default.BookmarkBorder, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save Route", color = DarkNavy, fontWeight = FontWeight.SemiBold)
+                    Text("Save Route", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
                 }
             }
         }
     }
 }
+}
 
 @Composable
-fun MapControlCircleButton(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+fun MapControlCircleButton(iconResId: Int, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.size(48.dp),
         shape = CircleShape,
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 6.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = DarkNavy)
+            Icon(
+                painter = painterResource(id = iconResId),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -599,7 +665,7 @@ fun DistanceInputDialog(
                 .fillMaxWidth()
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(
@@ -610,7 +676,7 @@ fun DistanceInputDialog(
                     "Set Loop Distance",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = DarkNavy
+                    color = MaterialTheme.colorScheme.primary
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -618,21 +684,22 @@ fun DistanceInputDialog(
                 Text(
                     "How many kilometers would you like to cycle today?",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                androidx.compose.material3.OutlinedTextField(
+                OutlinedTextField(
                     value = distance,
                     onValueChange = onDistanceChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Distance in km") },
+                    placeholder = { Text("1.4") },
                     suffix = { Text("km") },
                     shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
                     ),
                     singleLine = true
                 )
@@ -655,9 +722,97 @@ fun DistanceInputDialog(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DarkNavy)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("Generate", color = Color.White)
+                        Text("Generate", color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SaveRouteDialog(
+    routeName: String,
+    onRouteNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    isSaving: Boolean = false
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Save Your Route",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    "Give your journey a name to find it easily later.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                OutlinedTextField(
+                    value = routeName,
+                    onValueChange = onRouteNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Route Name") },
+                    placeholder = { Text("e.g. Morning Forest Loop") },
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    enabled = !isSaving
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !isSaving
+                    ) {
+                        Text("Cancel")
+                    }
+                    
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        enabled = !isSaving
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Save", color = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
             }
@@ -672,7 +827,7 @@ fun MapScreenPreview() {
         MapScreenContent(
             uiState = MapUiState(
                 isLocationPermissionGranted = true,
-                userLocation = com.siaka.data.LocationPoint(-1.286389, 36.817223)
+                userLocation = LocationPoint(-1.286389, 36.817223)
             ),
             onPermissionResult = {},
             onMapCentered = {},
@@ -682,36 +837,14 @@ fun MapScreenPreview() {
             onGenerateRoute = {},
             onStartNavigation = {},
             onSaveRoute = {},
+            onConfirmSaveRoute = {},
+            onDismissSaveRoute = {},
+            onRouteNameChange = {},
             onDistanceInputChange = {},
             onShowDistanceDialog = {},
-            onDismissDistanceDialog = {}
+            onDismissDistanceDialog = {},
+            onSnackbarDismissed = {}
         )
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun MapScreenNavigationPreview() {
-    SiakaTheme {
-        MapScreenContent(
-            uiState = MapUiState(
-                isLocationPermissionGranted = true,
-                userLocation = com.siaka.data.LocationPoint(-1.286389, 36.817223),
-                isNavigating = true,
-                nextInstruction = "Head North on Naivasha Road",
-                distanceToNextInstructionMeters = 297
-            ),
-            onPermissionResult = {},
-            onMapCentered = {},
-            onCenterOnLocationRequested = {},
-            onStopNavigation = {},
-            onClearRoute = {},
-            onGenerateRoute = {},
-            onStartNavigation = {},
-            onSaveRoute = {},
-            onDistanceInputChange = {},
-            onShowDistanceDialog = {},
-            onDismissDistanceDialog = {}
-        )
-    }
-}

@@ -4,14 +4,16 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import com.siaka.R
 import kotlinx.coroutines.delay
 
@@ -25,23 +27,24 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
-                painter = painterResource(id = R.drawable.logo),
+                painter = painterResource(id = R.mipmap.ic_launcher_foreground),
                 contentDescription = "Siaka Logo",
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .aspectRatio(1f),
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(32.dp))
             CircularProgressIndicator(
-                color = Color(0xFF1A237E)
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }

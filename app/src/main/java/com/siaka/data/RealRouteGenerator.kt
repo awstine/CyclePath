@@ -98,7 +98,7 @@ class RealRouteGenerator @Inject constructor() {
         
         // Circuity factor: road distance is typically ~1.5-2.0x straight line distance for loops.
         // We reduce the radius so the road-mapped route ends up closer to targetDistanceKm.
-        val circuityFactor = 2.2
+        val circuityFactor = 3.5
         val adjustedTargetDistance = targetDistanceKm / circuityFactor
         
         val radiusKm = adjustedTargetDistance / (2 * Math.PI)

@@ -7,6 +7,8 @@ import com.siaka.data.LocationManager
 import com.siaka.data.LocationPoint
 import com.siaka.data.MapUiState
 import com.siaka.data.MapboxRouteGenerator
+import com.siaka.data.local.RouteDao
+import com.siaka.data.local.SavedRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -19,7 +21,8 @@ import kotlin.math.*
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val locationManager: LocationManager,
-    private val routeGenerator: MapboxRouteGenerator
+    private val routeGenerator: MapboxRouteGenerator,
+    private val routeDao: RouteDao
 ) : ViewModel() {
 
     companion object {
@@ -117,6 +120,18 @@ class MapViewModel @Inject constructor(
         _uiState.update { it.copy(shouldCenterOnLocation = true) }
     }
 
+    fun onShowSaveRouteDialog() {
+        _uiState.update { it.copy(showSaveRouteDialog = true, routeNameInput = "My Ride ${System.currentTimeMillis() / 1000 / 60}") }
+    }
+
+    fun onDismissSaveRouteDialog() {
+        _uiState.update { it.copy(showSaveRouteDialog = false) }
+    }
+
+    fun onRouteNameInputChange(name: String) {
+        _uiState.update { it.copy(routeNameInput = name) }
+    }
+
     fun onMapCentered() {
         _uiState.update { it.copy(shouldCenterOnLocation = false) }
     }
@@ -128,7 +143,14 @@ class MapViewModel @Inject constructor(
     }
 
     fun stopNavigation() {
-        _uiState.update { it.copy(isNavigating = false) }
+        _uiState.update { 
+            it.copy(
+                isNavigating = false,
+                generatedRoutePoints = emptyList(),
+                routeSteps = emptyList(),
+                isRouteGenerated = false
+            ) 
+        }
     }
 
     fun clearRoute() {
@@ -143,7 +165,47 @@ class MapViewModel @Inject constructor(
     }
 
     fun saveRoute() {
-        Log.d(TAG, "Route saved to favorites")
+        val points = _uiState.value.generatedRoutePoints
+        val steps = _uiState.value.routeSteps
+        val distance = _uiState.value.remainingDistanceKm
+        val duration = _uiState.value.estimatedTimeMinutes
+        val routeName = _uiState.value.routeNameInput.ifEmpty { "My Ride" }
+
+        if (points.isNotEmpty()) {
+            _uiState.update { it.copy(isSaving = true) }
+            viewModelScope.launch {
+                try {
+                    val savedRoute = SavedRoute(
+                        distanceKm = distance,
+                        durationMinutes = duration,
+                        points = points,
+                        steps = steps,
+                        name = routeName
+                    )
+                    routeDao.insertRoute(savedRoute)
+                    Log.d(TAG, "Route saved successfully to database")
+                    _uiState.update { 
+                        it.copy(
+                            snackbarMessage = "Route saved successfully!",
+                            showSaveRouteDialog = false,
+                            isSaving = false
+                        ) 
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error saving route", e)
+                    _uiState.update { 
+                        it.copy(
+                            snackbarMessage = "Failed to save route",
+                            isSaving = false
+                        ) 
+                    }
+                }
+            }
+        }
+    }
+
+    fun onSnackbarDismissed() {
+        _uiState.update { it.copy(snackbarMessage = null) }
     }
 
     fun generateRoute() {
@@ -152,11 +214,15 @@ class MapViewModel @Inject constructor(
             return
         }
         
-        val distanceText = _uiState.value.distanceInput
+        val distanceText = _uiState.value.distanceInput.ifEmpty { "1.4" }
         val distance = distanceText.toDoubleOrNull() ?: run {
             Log.e(TAG, "Cannot generate route: Invalid distance: $distanceText")
             return
         }
+
+        // Add a small buffer/adjustment to the input distance to be more realistic
+        // Often Mapbox/OSRM finds routes that are slightly longer than the waypoints suggest.
+        // We already have circuityFactor in the generator, but we can also cap or adjust here if needed.
 
         Log.d(TAG, "Generating route from: ${currentUserLocation.latitude}, ${currentUserLocation.longitude} for ${distance}km")
         

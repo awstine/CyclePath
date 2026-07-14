@@ -24,5 +24,7 @@ val OnSurface = Color(0xFF1C1B1F)
 val OnError = Color.White
 
 val NavigationGreen = Color(0xFF2E7D32)
+val SoftGreen = Color(0xFFB9F6CA)
+val LightBlue = Color(0xFFE3F2FD)
 val DangerRed = Color(0xFFC62828)
 val DarkNavy = Color(0xFF0D1B2A)

@@ -117,7 +117,7 @@ class MapboxRouteGenerator @Inject constructor(
     }
 
     private fun generateCircularWaypoints(center: LocationPoint, targetDistanceKm: Double): List<LocationPoint> {
-        val circuityFactor = 2.2
+        val circuityFactor = 3.5
         val adjustedDistance = targetDistanceKm / circuityFactor
         val radiusKm = adjustedDistance / (2 * Math.PI)
         
@@ -127,6 +127,9 @@ class MapboxRouteGenerator @Inject constructor(
         val randomRotation = Math.random() * 2 * Math.PI
         val waypoints = mutableListOf<LocationPoint>()
         
+        // Start at user position
+        waypoints.add(center)
+        
         val numPoints = 5
         for (i in 0 until numPoints) {
             val angle = (2 * Math.PI * i / numPoints) + randomRotation
@@ -134,7 +137,9 @@ class MapboxRouteGenerator @Inject constructor(
             val lon = center.longitude + (radiusLonDeg * cos(angle))
             waypoints.add(LocationPoint(lat, lon))
         }
-        waypoints.add(waypoints.first()) // Close the loop
+        
+        // End at user position
+        waypoints.add(center)
         return waypoints
     }
 

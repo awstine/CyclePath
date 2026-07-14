@@ -10,13 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siaka.data.MapUiState
-import com.siaka.ui.theme.Primary
-import com.siaka.ui.theme.Secondary
 
 @Composable
 fun MapOverlayControls(
@@ -45,7 +42,7 @@ fun RouteInfoCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Row(
@@ -54,13 +51,13 @@ fun RouteInfoCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Surface(
-                    color = Color(0xFFC8E6C9),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         "Fastest Route",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = Secondary,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -73,13 +70,13 @@ fun RouteInfoCard(
                         text = "${uiState.remainingDistanceKm} km",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "/ ${uiState.estimatedTimeMinutes} mins",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
@@ -87,7 +84,7 @@ fun RouteInfoCard(
                 Text(
                     text = uiState.routeDescription,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
@@ -95,10 +92,10 @@ fun RouteInfoCard(
                 onClick = onStartNavigation,
                 modifier = Modifier.size(64.dp),
                 shape = CircleShape,
-                color = Primary
+                color = MaterialTheme.colorScheme.primary
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = Color.White, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(32.dp))
                 }
             }
         }
@@ -115,7 +112,7 @@ fun GenerationCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
@@ -126,7 +123,7 @@ fun GenerationCard(
                 text = "Where are we riding today?",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Primary
+                color = MaterialTheme.colorScheme.primary
             )
 
             OutlinedTextField(
@@ -142,11 +139,10 @@ fun GenerationCard(
                 onClick = onGenerateClick,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp),
-                enabled = uiState.distanceInput.isNotEmpty() && !uiState.isLoadingRoute,
-                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                enabled = uiState.distanceInput.isNotEmpty() && !uiState.isLoadingRoute
             ) {
                 if (uiState.isLoadingRoute) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text("Generate Route")
                 }
@@ -164,15 +160,15 @@ fun NavigationControls(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             LinearProgressIndicator(
                 progress = { 0.4f },
                 modifier = Modifier.fillMaxWidth().height(4.dp),
-                color = Primary,
-                trackColor = Color.LightGray
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -183,23 +179,23 @@ fun NavigationControls(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("ETA", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(uiState.eta, fontWeight = FontWeight.Bold, color = Primary)
+                    Text("ETA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(uiState.eta, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 
                 Column {
-                    Text("REMAINING", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text("${uiState.estimatedTimeMinutes} min", fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text("REMAINING", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${uiState.estimatedTimeMinutes} min", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
                 
                 Column {
-                    Text("DISTANCE", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text("${uiState.remainingDistanceKm} km", fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text("DISTANCE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${uiState.remainingDistanceKm} km", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
                 
                 Button(
                     onClick = onStopNavigation,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {

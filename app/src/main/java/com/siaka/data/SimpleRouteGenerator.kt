@@ -24,8 +24,12 @@ class SimpleRouteGenerator @Inject constructor() {
         val route = mutableListOf<LocationPoint>()
         val numWaypoints = 12 // More waypoints = smoother loop
         
+        // Use a circuity factor to make the straight-line distance shorter than target
+        val circuityFactor = 1.2
+        val adjustedDistance = targetDistanceKm / circuityFactor
+        
         // Calculate radius in degrees
-        val radiusKm = targetDistanceKm / (2 * Math.PI) // radius of circle
+        val radiusKm = adjustedDistance / (2 * Math.PI) // radius of circle
         val radiusLatDeg = radiusKm / KM_PER_DEGREE_LAT // radius in latitude degrees
         val radiusLonDeg = radiusKm / (KM_PER_DEGREE_LAT * cos(Math.toRadians(centerPoint.latitude))) // radius in longitude degrees (adjusted for latitude)
         

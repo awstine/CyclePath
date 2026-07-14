@@ -82,4 +82,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.mapbox.maps:android-ndk27:11.25.0")
     implementation("com.mapbox.extension:maps-compose-ndk27:11.25.0")
+
+
+    val media3Version = "1.3.1"
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
 }

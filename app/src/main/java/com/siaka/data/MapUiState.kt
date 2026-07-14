@@ -13,12 +13,16 @@ data class MapUiState(
     val routeSteps: List<RouteStep> = emptyList(),
     val isLoadingRoute: Boolean = false,
     val isMyLocationEnabled: Boolean = false,
-    val distanceInput: String = "1.4",
+    val distanceInput: String = "",
     val showDistanceDialog: Boolean = false,
     val shouldCenterOnLocation: Boolean = false,
     val isNavigating: Boolean = false,
     val isRouteGenerated: Boolean = false,
     val error: String? = null,
+    val snackbarMessage: String? = null,
+    val showSaveRouteDialog: Boolean = false,
+    val routeNameInput: String = "",
+    val isSaving: Boolean = false,
     
     // Navigation details
     val estimatedTimeMinutes: Int = 45,
