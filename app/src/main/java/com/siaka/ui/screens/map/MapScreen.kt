@@ -90,10 +90,17 @@ import com.siaka.ui.theme.SiakaTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
+    routeId: Long? = null,
     viewModel: MapViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(routeId) {
+        if (routeId != null) {
+            viewModel.loadSavedRoute(routeId)
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -131,21 +138,7 @@ fun MapScreen(
 
     MapScreenContent(
         uiState = uiState,
-        onPermissionResult = viewModel::onPermissionResult,
-        onMapCentered = viewModel::onMapCentered,
-        onCenterOnLocationRequested = viewModel::onCenterOnLocationRequested,
-        onStopNavigation = viewModel::stopNavigation,
-        onClearRoute = viewModel::clearRoute,
-        onGenerateRoute = viewModel::generateRoute,
-        onStartNavigation = viewModel::startNavigation,
-        onSaveRoute = viewModel::onShowSaveRouteDialog,
-        onConfirmSaveRoute = viewModel::saveRoute,
-        onDismissSaveRoute = viewModel::onDismissSaveRouteDialog,
-        onRouteNameChange = viewModel::onRouteNameInputChange,
-        onDistanceInputChange = viewModel::onDistanceInputChange,
-        onShowDistanceDialog = viewModel::onShowDistanceDialog,
-        onDismissDistanceDialog = viewModel::onDismissDistanceDialog,
-        onSnackbarDismissed = viewModel::onSnackbarDismissed
+        viewModel = viewModel
     )
 }
 
@@ -153,21 +146,7 @@ fun MapScreen(
 @Composable
 fun MapScreenContent(
     uiState: MapUiState,
-    onPermissionResult: (Boolean) -> Unit,
-    onMapCentered: () -> Unit,
-    onCenterOnLocationRequested: () -> Unit,
-    onStopNavigation: () -> Unit,
-    onClearRoute: () -> Unit,
-    onGenerateRoute: () -> Unit,
-    onStartNavigation: () -> Unit,
-    onSaveRoute: () -> Unit,
-    onConfirmSaveRoute: () -> Unit,
-    onDismissSaveRoute: () -> Unit,
-    onRouteNameChange: (String) -> Unit,
-    onDistanceInputChange: (String) -> Unit,
-    onShowDistanceDialog: () -> Unit,
-    onDismissDistanceDialog: () -> Unit,
-    onSnackbarDismissed: () -> Unit
+    viewModel: MapViewModel
 ) {
     val viewportState = rememberMapViewportState {
         setCameraOptions {
@@ -181,7 +160,7 @@ fun MapScreenContent(
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
-            onSnackbarDismissed()
+            viewModel.onSnackbarDismissed()
         }
     }
 
@@ -198,7 +177,7 @@ fun MapScreenContent(
                         .build()
                 )
                 if (uiState.shouldCenterOnLocation) {
-                    onMapCentered()
+                    viewModel.onMapCentered()
                 }
             }
         }
@@ -292,7 +271,7 @@ fun MapScreenContent(
                     .statusBarsPadding()
                     .padding(top = 16.dp)
             ) {
-                SearchBarOverlay(onClick = onShowDistanceDialog)
+                SearchBarOverlay(onClick = viewModel::onShowDistanceDialog)
             }
 
             // 4. Map Action Buttons (Right side)
@@ -320,10 +299,40 @@ fun MapScreenContent(
                         )
                     }
                 }
-                MapControlCircleButton(R.drawable.gps) { onCenterOnLocationRequested() }
+                MapControlCircleButton(R.drawable.gps) { viewModel.onCenterOnLocationRequested() }
             }
 
-            // 5. Bottom Controls (Route Actions OR Navigation Details)
+            // 5. Automatic Offline Progress Indicator (Subtle)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = uiState.isOfflineDownloading,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp, end = 16.dp)
+            ) {
+                Surface(
+                    color = Color.White.copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(8.dp),
+                    shadowElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { uiState.offlineDownloadProgress ?: 0f },
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = PrimaryDark
+                        )
+                        Text(
+                            "Saving offline map...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PrimaryDark
+                        )
+                    }
+                }
+            }
+
+            // 6. Bottom Controls (Route Actions OR Navigation Details)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -337,10 +346,10 @@ fun MapScreenContent(
                     exit = slideOutVertically(targetOffsetY = { it })
                 ) {
                     RouteActionButtons(
-                        onRegenerate = onShowDistanceDialog,
-                        onStart = onStartNavigation,
-                        onSave = onSaveRoute,
-                        onClose = onClearRoute
+                        onRegenerate = viewModel::onShowDistanceDialog,
+                        onStart = viewModel::startNavigation,
+                        onSave = viewModel::onShowSaveRouteDialog,
+                        onClose = viewModel::clearRoute
                     )
                 }
 
@@ -359,7 +368,7 @@ fun MapScreenContent(
                         ) {
                             // End Navigation Button (Primary)
                             Button(
-                                onClick = onStopNavigation,
+                                onClick = viewModel::stopNavigation,
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
                                 modifier = Modifier
@@ -393,18 +402,18 @@ fun MapScreenContent(
         if (uiState.showDistanceDialog) {
             DistanceInputDialog(
                 distance = uiState.distanceInput,
-                onDistanceChange = onDistanceInputChange,
-                onConfirm = onGenerateRoute,
-                onDismiss = onDismissDistanceDialog
+                onDistanceChange = viewModel::onDistanceInputChange,
+                onConfirm = viewModel::generateRoute,
+                onDismiss = viewModel::onDismissDistanceDialog
             )
         }
 
         if (uiState.showSaveRouteDialog) {
             SaveRouteDialog(
                 routeName = uiState.routeNameInput,
-                onRouteNameChange = onRouteNameChange,
-                onConfirm = onConfirmSaveRoute,
-                onDismiss = onDismissSaveRoute,
+                onRouteNameChange = viewModel::onRouteNameInputChange,
+                onConfirm = viewModel::saveRoute,
+                onDismiss = viewModel::onDismissSaveRouteDialog,
                 isSaving = uiState.isSaving
             )
         }
@@ -820,31 +829,31 @@ fun SaveRouteDialog(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun MapScreenPreview() {
-    SiakaTheme {
-        MapScreenContent(
-            uiState = MapUiState(
-                isLocationPermissionGranted = true,
-                userLocation = LocationPoint(-1.286389, 36.817223)
-            ),
-            onPermissionResult = {},
-            onMapCentered = {},
-            onCenterOnLocationRequested = {},
-            onStopNavigation = {},
-            onClearRoute = {},
-            onGenerateRoute = {},
-            onStartNavigation = {},
-            onSaveRoute = {},
-            onConfirmSaveRoute = {},
-            onDismissSaveRoute = {},
-            onRouteNameChange = {},
-            onDistanceInputChange = {},
-            onShowDistanceDialog = {},
-            onDismissDistanceDialog = {},
-            onSnackbarDismissed = {}
-        )
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun MapScreenPreview() {
+//    SiakaTheme {
+//        MapScreenContent(
+//            uiState = MapUiState(
+//                isLocationPermissionGranted = true,
+//                userLocation = LocationPoint(-1.286389, 36.817223)
+//            ),
+//            onPermissionResult = {},
+//            onMapCentered = {},
+//            onCenterOnLocationRequested = {},
+//            onStopNavigation = {},
+//            onClearRoute = {},
+//            onGenerateRoute = {},
+//            onStartNavigation = {},
+//            onSaveRoute = {},
+//            onConfirmSaveRoute = {},
+//            onDismissSaveRoute = {},
+//            onRouteNameChange = {},
+//            onDistanceInputChange = {},
+//            onShowDistanceDialog = {},
+//            onDismissDistanceDialog = {},
+//            onSnackbarDismissed = {}
+//        )
+//    }
+//}
 

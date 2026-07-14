@@ -7,6 +7,7 @@ import com.siaka.data.LocationManager
 import com.siaka.data.LocationPoint
 import com.siaka.data.MapUiState
 import com.siaka.data.MapboxRouteGenerator
+import com.siaka.data.OfflineMapManager
 import com.siaka.data.local.RouteDao
 import com.siaka.data.local.SavedRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,7 +23,8 @@ import kotlin.math.*
 class MapViewModel @Inject constructor(
     private val locationManager: LocationManager,
     private val routeGenerator: MapboxRouteGenerator,
-    private val routeDao: RouteDao
+    private val routeDao: RouteDao,
+    private val offlineMapManager: OfflineMapManager
 ) : ViewModel() {
 
     companion object {
@@ -33,6 +35,20 @@ class MapViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private var locationJob: Job? = null
+    private var hasAutoDownloaded = false
+
+    init {
+        viewModelScope.launch {
+            offlineMapManager.downloadProgress.collect { progress ->
+                _uiState.update { it.copy(offlineDownloadProgress = progress) }
+            }
+        }
+        viewModelScope.launch {
+            offlineMapManager.isDownloading.collect { isDownloading ->
+                _uiState.update { it.copy(isOfflineDownloading = isDownloading) }
+            }
+        }
+    }
 
     fun onPermissionResult(isGranted: Boolean) {
         _uiState.update {
@@ -58,6 +74,12 @@ class MapViewModel @Inject constructor(
                     bearing = if (location.hasBearing()) location.bearing else null
                 )
                 
+                // Auto-download offline map on first valid location
+                if (!hasAutoDownloaded) {
+                    hasAutoDownloaded = true
+                    offlineMapManager.downloadRegion(userPoint)
+                }
+
                 _uiState.update { state ->
                     var updatedState = state.copy(userLocation = userPoint)
                     if (state.isNavigating) {
@@ -121,7 +143,7 @@ class MapViewModel @Inject constructor(
     }
 
     fun onShowSaveRouteDialog() {
-        _uiState.update { it.copy(showSaveRouteDialog = true, routeNameInput = "My Ride ${System.currentTimeMillis() / 1000 / 60}") }
+        _uiState.update { it.copy(showSaveRouteDialog = true, routeNameInput = "") }
     }
 
     fun onDismissSaveRouteDialog() {
@@ -200,6 +222,35 @@ class MapViewModel @Inject constructor(
                         ) 
                     }
                 }
+            }
+        }
+    }
+
+    fun loadSavedRoute(routeId: Long) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRoute = true) }
+            try {
+                val route = routeDao.getRouteById(routeId)
+                if (route != null) {
+                    _uiState.update {
+                        it.copy(
+                            generatedRoutePoints = route.points,
+                            routeSteps = route.steps,
+                            isRouteGenerated = true,
+                            remainingDistanceKm = route.distanceKm,
+                            estimatedTimeMinutes = route.durationMinutes,
+                            remainingMinutes = route.durationMinutes,
+                            isLoadingRoute = false,
+                            shouldCenterOnLocation = true
+                        )
+                    }
+                    Log.d(TAG, "Loaded saved route: ${route.name}")
+                } else {
+                    _uiState.update { it.copy(isLoadingRoute = false, error = "Route not found") }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading route", e)
+                _uiState.update { it.copy(isLoadingRoute = false, error = "Failed to load route") }
             }
         }
     }

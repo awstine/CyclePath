@@ -24,6 +24,10 @@ data class MapUiState(
     val routeNameInput: String = "",
     val isSaving: Boolean = false,
     
+    // Offline Map state
+    val offlineDownloadProgress: Float? = null,
+    val isOfflineDownloading: Boolean = false,
+    
     // Navigation details
     val estimatedTimeMinutes: Int = 45,
     val remainingMinutes: Int = 45,

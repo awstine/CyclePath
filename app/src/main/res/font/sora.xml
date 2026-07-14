@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<font-family xmlns:app="http://schemas.android.com/apk/res-auto">
+    <font
+        app:font="@font/sora_thin"
+        app:fontWeight="100"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_extra_light"
+        app:fontWeight="200"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_light"
+        app:fontWeight="300"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_regular"
+        app:fontWeight="400"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_medium"
+        app:fontWeight="500"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_semi_bold"
+        app:fontWeight="600"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_bold"
+        app:fontWeight="700"
+        app:fontStyle="normal" />
+    <font
+        app:font="@font/sora_extra_bold"
+        app:fontWeight="800"
+        app:fontStyle="normal" />
+</font-family>

@@ -27,11 +27,13 @@ sealed class Screen(
         iconVector = Icons.Outlined.Map,
         selectedIconVector = Icons.Default.Map)
     object Map : Screen(
-        route = "map",
+        route = "map?routeId={routeId}",
         title = "Map",
         iconRes = R.drawable.map_icon_outlined,
         selectedIconRes = R.drawable.map_icon_filled
-    )
+    ) {
+        fun createRoute(routeId: Long? = null) = if (routeId != null) "map?routeId=$routeId" else "map"
+    }
     object Routes : Screen(
         route = "routes",
         title = "Routes",

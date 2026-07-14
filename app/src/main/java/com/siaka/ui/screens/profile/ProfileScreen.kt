@@ -80,7 +80,7 @@ fun ProfileScreen() {
                     .background(Color.White)
             ) {
                 ProfileOptionItem(
-                    icon = painterResource(R.drawable.profile_outlined),
+                    icon = ProfileIcon.Painter(painterResource(R.drawable.profile_outlined)),
                     title = "Personal Information",
                     subtitle = "Update your name and email",
                     onClick = {}
@@ -88,7 +88,7 @@ fun ProfileScreen() {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
 
                 ProfileOptionItem(
-                    icon = Icons.Default.History,
+                    icon = ProfileIcon.Vector(Icons.Default.History),
                     title = "Ride History",
                     subtitle = "Your previous journeys",
                     onClick = {}
@@ -108,7 +108,7 @@ fun ProfileScreen() {
                     .background(Color.White)
             ) {
                 ProfileOptionItem(
-                    icon = Icons.Default.Settings,
+                    icon = ProfileIcon.Vector(Icons.Default.Settings),
                     title = "App Settings",
                     subtitle = "Notification and Appearance",
                     onClick = {}
@@ -116,7 +116,7 @@ fun ProfileScreen() {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
 
                 ProfileOptionItem(
-                    icon = Icons.AutoMirrored.Filled.Help,
+                    icon = ProfileIcon.Vector(Icons.AutoMirrored.Filled.Help),
                     title = "Help & Support",
                     subtitle = "Get assistance from our team",
                     onClick = {}
@@ -229,7 +229,7 @@ fun ProfileHeader() {
 
 @Composable
 fun ProfileOptionItem(
-    icon: Any,
+    icon: ProfileIcon,
     title: String,
     subtitle: String,
     onClick: () -> Unit
@@ -248,8 +248,8 @@ fun ProfileOptionItem(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 when (icon) {
-                    is ImageVector -> Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
-                    is Painter -> Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
+                    is ProfileIcon.Vector -> Icon(icon.imageVector, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
+                    is ProfileIcon.Painter -> Icon(icon.painter, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -276,6 +276,11 @@ fun ProfileOptionItem(
             modifier = Modifier.size(20.dp)
         )
     }
+}
+
+sealed class ProfileIcon {
+    data class Vector(val imageVector: ImageVector) : ProfileIcon()
+    data class Painter(val painter: androidx.compose.ui.graphics.painter.Painter) : ProfileIcon()
 }
 
 @Preview(showBackground = true)

@@ -5,8 +5,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,28 +12,33 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QuestionMark
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.siaka.ui.navigation.Screen
 import com.siaka.ui.screens.map.MapScreen
 import com.siaka.ui.screens.onboarding.OnboardingScreen
 import com.siaka.ui.screens.profile.ProfileScreen
 import com.siaka.ui.screens.routes.RoutesScreen
-import com.siaka.ui.screens.settings.SettingsScreen
-import com.siaka.ui.theme.DarkNavy
 import com.siaka.ui.theme.SoftGreen
 
 @Composable
@@ -45,9 +48,8 @@ fun MainScaffold() {
     val currentDestination = navBackStackEntry?.destination
     
     // Hide bottom bar on Onboarding screen
-    val showBottomBar = currentDestination?.route != null && 
-                        currentDestination.route != Screen.Onboarding.route
-    
+    val showBottomBar = currentDestination?.route != null && currentDestination.route != Screen.Onboarding.route
+
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -61,12 +63,28 @@ fun MainScaffold() {
                     }
                 })
             }
-            composable(Screen.Map.route) { MapScreen() }
-            composable(Screen.Routes.route) { RoutesScreen() }
+            composable(
+                route = Screen.Map.route,
+                arguments = listOf(navArgument("routeId") { 
+                    type = NavType.StringType 
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
+                val routeId = backStackEntry.arguments?.getString("routeId")?.toLongOrNull()
+                MapScreen(routeId = routeId)
+            }
+            composable(Screen.Routes.route) { 
+                RoutesScreen(onRouteSelected = { id ->
+                    navController.navigate(Screen.Map.createRoute(id)) {
+                        popUpTo(Screen.Map.route) { inclusive = true }
+                    }
+                }) 
+            }
             composable(Screen.Profile.route) { ProfileScreen() }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = showBottomBar,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
@@ -85,9 +103,9 @@ fun MainScaffold() {
                             val iconPainter = when {
                                 selected && screen.selectedIconRes != null -> painterResource(screen.selectedIconRes)
                                 !selected && screen.iconRes != null -> painterResource(screen.iconRes)
-                                selected && screen.selectedIconVector != null -> androidx.compose.ui.graphics.vector.rememberVectorPainter(screen.selectedIconVector)
-                                !selected && screen.iconVector != null -> androidx.compose.ui.graphics.vector.rememberVectorPainter(screen.iconVector)
-                                else -> androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.QuestionMark)
+                                selected && screen.selectedIconVector != null -> rememberVectorPainter(screen.selectedIconVector)
+                                !selected && screen.iconVector != null -> rememberVectorPainter(screen.iconVector)
+                                else -> rememberVectorPainter(Icons.Default.QuestionMark)
                             }
 
                             if (selected) {
