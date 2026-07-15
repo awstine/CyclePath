@@ -24,7 +24,7 @@ class SimpleRouteGenerator @Inject constructor() {
         val route = mutableListOf<LocationPoint>()
         val numWaypoints = 12 // More waypoints = smoother loop
         
-        // Use a circuity factor to make the straight-line distance shorter than target
+        // Use a circuity factor to shorten the straight-line distance than target
         val circuityFactor = 1.2
         val adjustedDistance = targetDistanceKm / circuityFactor
         
@@ -36,7 +36,7 @@ class SimpleRouteGenerator @Inject constructor() {
         // Create an irregular but road-like loop
         val random = Random(centerPoint.latitude.toBits()) // Deterministic seed based on location
         
-        // Add start point
+        // Add a start point
         route.add(centerPoint)
         
         // Generate waypoints that approximate the desired distance
@@ -53,7 +53,7 @@ class SimpleRouteGenerator @Inject constructor() {
             route.add(LocationPoint(lat, lon))
         }
         
-        // Close the loop by adding start point again
+        // Close the loop by adding the start point again
         route.add(centerPoint)
         
         Log.d(TAG, "Generated route with ${route.size} points")
