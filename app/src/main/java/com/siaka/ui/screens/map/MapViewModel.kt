@@ -24,6 +24,7 @@ class MapViewModel @Inject constructor(
     private val locationManager: LocationManager,
     private val routeGenerator: MapboxRouteGenerator,
     private val routeDao: RouteDao,
+    private val completedRideDao: com.siaka.data.local.CompletedRideDao,
     private val offlineMapManager: OfflineMapManager
 ) : ViewModel() {
 
@@ -35,7 +36,10 @@ class MapViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private var locationJob: Job? = null
+    private var statsJob: Job? = null
     private var hasAutoDownloaded = false
+    private var startTimeMillis: Long = 0
+    private var lastTrackedLocation: LocationPoint? = null
 
     init {
         viewModelScope.launch {
@@ -74,14 +78,26 @@ class MapViewModel @Inject constructor(
                     bearing = if (location.hasBearing()) location.bearing else null
                 )
                 
-                // Auto-download offline map on first valid location
-                if (!hasAutoDownloaded) {
-                    hasAutoDownloaded = true
-                    offlineMapManager.downloadRegion(userPoint)
-                }
+                val speedKmh = if (location.hasSpeed()) location.speed * 3.6 else 0.0
+                val altitude = if (location.hasAltitude()) location.altitude else 0.0
 
                 _uiState.update { state ->
-                    var updatedState = state.copy(userLocation = userPoint)
+                    if (state.isPaused) return@update state
+                    
+                    val distanceDeltaKm = lastTrackedLocation?.let { 
+                        calculateDistance(it, userPoint) / 1000.0 
+                    } ?: 0.0
+                    
+                    // Only count movement if speed is > 1km/h to avoid GPS jitter while stationary
+                    val validDistanceDelta = if (speedKmh > 1.0) distanceDeltaKm else 0.0
+                    lastTrackedLocation = userPoint
+
+                    var updatedState = state.copy(
+                        userLocation = userPoint,
+                        currentSpeedKmh = speedKmh,
+                        altitudeMeters = altitude,
+                        totalDistanceCoveredKm = state.totalDistanceCoveredKm + validDistanceDelta
+                    )
                     if (state.isNavigating) {
                         updatedState = updateNavigationDetails(updatedState, userPoint)
                     }
@@ -91,23 +107,58 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun updateNavigationDetails(state: MapUiState, userLocation: LocationPoint): MapUiState {
-        val steps = state.routeSteps
-        if (steps.isEmpty()) return state
+    private fun startStatsTimer() {
+        statsJob?.cancel()
+        startTimeMillis = System.currentTimeMillis()
+        statsJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                if (!_uiState.value.isPaused) {
+                    val elapsed = _uiState.value.elapsedTimeSeconds + 1
+                    _uiState.update { it.copy(elapsedTimeSeconds = elapsed) }
+                }
+            }
+        }
+    }
 
-        // Find the first step that is ahead of the user (e.g., more than 30m away)
-        // This is a simple heuristic for mock navigation
+    fun togglePause() {
+        _uiState.update { it.copy(isPaused = !it.isPaused) }
+    }
+
+    private fun updateNavigationDetails(state: MapUiState, userLocation: LocationPoint): MapUiState {
+        val points = state.generatedRoutePoints
+        val steps = state.routeSteps
+        if (points.isEmpty() || steps.isEmpty()) return state
+
+        // 1. Find the next instruction
         val nextStep = steps.firstOrNull { step ->
             calculateDistance(userLocation, step.location) > 30 
         } ?: steps.last()
 
         val distanceToNext = calculateDistance(userLocation, nextStep.location).toInt()
 
+        // 2. Calculate REAL remaining distance to finish
+        // Find the index of the point on the route closest to the user
+        var closestIdx = 0
+        var minDistance = Double.MAX_VALUE
+        points.forEachIndexed { index, point ->
+            val d = calculateDistance(userLocation, point)
+            if (d < minDistance) {
+                minDistance = d
+                closestIdx = index
+            }
+        }
+
+        // Sum distance from user to the closest point, then from there to the end
+        var remainingMeters = calculateDistance(userLocation, points[closestIdx])
+        for (i in closestIdx until points.size - 1) {
+            remainingMeters += calculateDistance(points[i], points[i + 1])
+        }
+
         return state.copy(
             nextInstruction = nextStep.instruction,
             distanceToNextInstructionMeters = distanceToNext,
-            // Update remaining distance (simplified)
-            remainingDistanceKm = max(0.0, state.remainingDistanceKm - 0.01) 
+            remainingDistanceKm = remainingMeters / 1000.0
         )
     }
 
@@ -160,19 +211,59 @@ class MapViewModel @Inject constructor(
 
     fun startNavigation() {
         if (_uiState.value.generatedRoutePoints.isNotEmpty()) {
-            _uiState.update { it.copy(isNavigating = true, shouldCenterOnLocation = true) }
+            lastTrackedLocation = _uiState.value.userLocation
+            _uiState.update { 
+                it.copy(
+                    isNavigating = true, 
+                    isPaused = false,
+                    shouldCenterOnLocation = true,
+                    elapsedTimeSeconds = 0,
+                    totalDistanceCoveredKm = 0.0,
+                    totalRouteDistanceKm = it.remainingDistanceKm
+                ) 
+            }
+            startStatsTimer()
         }
     }
 
     fun stopNavigation() {
+        statsJob?.cancel()
+        val currentState = _uiState.value
+        val avgSpeed = if (currentState.elapsedTimeSeconds > 0) {
+            currentState.totalDistanceCoveredKm / (currentState.elapsedTimeSeconds / 3600.0)
+        } else 0.0
+
+        viewModelScope.launch {
+            try {
+                completedRideDao.insertCompletedRide(
+                    com.siaka.data.local.CompletedRide(
+                        distanceKm = currentState.totalDistanceCoveredKm,
+                        durationSeconds = currentState.elapsedTimeSeconds,
+                        avgSpeedKmh = avgSpeed
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving completed ride", e)
+            }
+        }
+
         _uiState.update { 
             it.copy(
                 isNavigating = false,
                 generatedRoutePoints = emptyList(),
                 routeSteps = emptyList(),
-                isRouteGenerated = false
+                isRouteGenerated = false,
+                showSummaryDialog = true,
+                lastRideDistanceKm = currentState.totalDistanceCoveredKm,
+                lastRideDurationSeconds = currentState.elapsedTimeSeconds,
+                lastRideAvgSpeedKmh = avgSpeed
             ) 
         }
+        lastTrackedLocation = null
+    }
+
+    fun onDismissSummary() {
+        _uiState.update { it.copy(showSummaryDialog = false) }
     }
 
     fun clearRoute() {
@@ -297,6 +388,7 @@ class MapViewModel @Inject constructor(
                             isLoadingRoute = false,
                             showDistanceDialog = false,
                             remainingDistanceKm = routeData.totalDistanceKm,
+                            totalRouteDistanceKm = routeData.totalDistanceKm,
                             estimatedTimeMinutes = routeData.totalDurationMinutes,
                             remainingMinutes = routeData.totalDurationMinutes,
                             error = if (routeData.points.isEmpty()) "No route found" else null
