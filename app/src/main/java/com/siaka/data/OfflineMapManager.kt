@@ -45,7 +45,10 @@ class OfflineMapManager @Inject constructor() {
             Style.MAPBOX_STREETS,
             stylePackOptions,
             { progress ->
-                Log.d("OfflineMapManager", "Style Pack progress: ${progress.completedResourceCount}/${progress.requiredResourceCount}")
+                Log.d(
+                    "OfflineMapManager",
+                    "Style Pack progress: ${progress.completedResourceCount}/${progress.requiredResourceCount}"
+                )
             },
             { result ->
                 if (result.isValue) {

@@ -71,7 +71,7 @@ class RealRouteGenerator @Inject constructor() {
                     Log.d(TAG, "Route found: ${points.size} points, distance: ${"%.2f".format(actualDistance)}km")
                     
                     // VERY lenient check: Allow up to 200% mismatch to prioritize road-based routes
-                    // over geometric fallbacks. We want roads even if distance isn't perfect.
+                    // over geometric fallbacks. We want roads even if the distance isn't perfect.
                     if (abs(actualDistance - targetDistanceKm) / targetDistanceKm < 2.0) {
                         return@withContext points
                     } else {
@@ -82,7 +82,7 @@ class RealRouteGenerator @Inject constructor() {
                 Log.e(TAG, "OSRM Error: ${response.code()} - ${response.message()}")
             }
             
-            // Fallback: generate approximate route if OSRM fails
+            // Fallback: generate an approximate route if OSRM fails
             generateApproximateLoopRoute(centerPoint, targetDistanceKm)
             
         } catch (e: Exception) {
@@ -93,7 +93,7 @@ class RealRouteGenerator @Inject constructor() {
     }
     
     private fun generateWaypoints(center: LocationPoint, targetDistanceKm: Double): List<LocationPoint> {
-        // Reduced number of waypoints (5 instead of 8) makes it easier for OSRM to find a shorter route
+        // The reduced number of waypoints (5 instead of 8) makes it easier for OSRM to find a shorter route
         val numWaypoints = 5
         
         // Circuity factor: road distance is typically ~1.5-2.0x straight line distance for loops.
@@ -136,7 +136,7 @@ class RealRouteGenerator @Inject constructor() {
         Log.d(TAG, "Using approximate route generation")
         
         val route = mutableListOf<LocationPoint>()
-        val numWaypoints = 20 // More points for smoother route
+        val numWaypoints = 20 // More points for a smoother route
         
         val radiusKm = targetDistanceKm / (2 * Math.PI)
         val radiusLatDeg = radiusKm / KM_PER_DEGREE_LAT
