@@ -116,12 +116,14 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             visible = pagerState.currentPage < pages.size - 1 && !isNavigatingAway,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 40.dp),
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -559,6 +561,7 @@ fun PrecisionNavigationPage(page: OnboardingPage) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom
@@ -581,7 +584,7 @@ fun PrecisionNavigationPage(page: OnboardingPage) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(120.dp)) // Space for bottom controls
+            Spacer(modifier = Modifier.height(100.dp)) // Space for bottom controls
         }
     }
 }
@@ -615,6 +618,7 @@ fun LastOnboardingPage(page: OnboardingPage, onFinish: () -> Unit, isNavigating:
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.Bottom

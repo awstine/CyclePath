@@ -7,6 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,7 +56,14 @@ fun MainScaffold() {
         currentDestination.route != Screen.Onboarding.route &&
         currentDestination.route != Screen.RideHistory.route
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F7)) // Background matches NavigationBar
+    ) {
+        val navBarHeight = 80.dp
+        val navigationBarsPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        
         NavHost(
             navController = navController,
             startDestination = Screen.Onboarding.route,
@@ -104,8 +114,9 @@ fun MainScaffold() {
         ) {
             NavigationBar(
                 containerColor = Color(0xFFF5F5F7), // Light grey background
-                modifier = Modifier.height(80.dp),
-                tonalElevation = 0.dp
+                modifier = Modifier.height(navBarHeight + navigationBarsPadding),
+                tonalElevation = 0.dp,
+                windowInsets = WindowInsets.navigationBars
             ) {
                 Screen.items.forEach { screen ->
                     val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
