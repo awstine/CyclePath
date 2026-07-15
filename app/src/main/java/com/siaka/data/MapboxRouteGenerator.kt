@@ -127,7 +127,7 @@ class MapboxRouteGenerator @Inject constructor(
         val randomRotation = Math.random() * 2 * Math.PI
         val waypoints = mutableListOf<LocationPoint>()
         
-        // Start at user position
+        // Start at the user position
         waypoints.add(center)
         
         val numPoints = 5
