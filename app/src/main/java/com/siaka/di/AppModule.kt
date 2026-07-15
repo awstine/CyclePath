@@ -3,6 +3,7 @@ package com.siaka.di
 import android.content.Context
 import androidx.room.Room
 import com.siaka.data.local.RouteDao
+import com.siaka.data.local.CompletedRideDao
 import com.siaka.data.local.SiakaDatabase
 import dagger.Module
 import dagger.Provides
@@ -21,11 +22,18 @@ object AppModule {
             context,
             SiakaDatabase::class.java,
             "siaka_database"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides
     fun provideRouteDao(database: SiakaDatabase): RouteDao {
         return database.routeDao()
+    }
+
+    @Provides
+    fun provideCompletedRideDao(database: SiakaDatabase): CompletedRideDao {
+        return database.completedRideDao()
     }
 }

@@ -9,7 +9,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -17,30 +19,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.DarkGray
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siaka.R
-import androidx.compose.ui.tooling.preview.Preview
-import com.siaka.ui.theme.Background
-import com.siaka.ui.theme.DarkNavy
-import com.siaka.ui.theme.DangerRed
-import com.siaka.ui.theme.SiakaTheme
-import com.siaka.ui.theme.LightBlue
-import com.siaka.ui.theme.Neutral
-import com.siaka.ui.theme.Primary
-import com.siaka.ui.theme.PrimaryDark
-import com.siaka.ui.theme.PrimaryLight
-import com.siaka.ui.theme.Secondary
-import com.siaka.ui.theme.Tertiary
+import com.siaka.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onNavigateToRideHistory: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,7 +83,7 @@ fun ProfileScreen() {
                     icon = ProfileIcon.Vector(Icons.Default.History),
                     title = "Ride History",
                     subtitle = "Your previous journeys",
-                    onClick = {}
+                    onClick = onNavigateToRideHistory
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
             }
@@ -183,7 +175,6 @@ fun ProfileHeader() {
                     .size(120.dp)
                     .clip(CircleShape),
                 color = LightBlue.copy(alpha = 0.4f),
-               // border = BorderStroke(4.dp, Color.White)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -195,13 +186,13 @@ fun ProfileHeader() {
                 }
             }
             
-            // Edit Button (Pen)
+            // Edit Button
             Surface(
                 modifier = Modifier
                     .size(36.dp)
                     .offset(x = (-4).dp, y = (-4).dp)
                     .clip(CircleShape)
-                    .clickable { /* TODO: Pick Image */ },
+                    .clickable { },
                 color = Secondary,
                 contentColor = Color.White,
                 tonalElevation = 4.dp,
@@ -220,7 +211,7 @@ fun ProfileHeader() {
         Spacer(modifier = Modifier.height(20.dp))
         
         Text(
-            text = "John Doe",
+            text = "Siaka Rider",
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
             color = PrimaryLight
         )
@@ -282,12 +273,3 @@ sealed class ProfileIcon {
     data class Vector(val imageVector: ImageVector) : ProfileIcon()
     data class Painter(val painter: androidx.compose.ui.graphics.painter.Painter) : ProfileIcon()
 }
-
-@Preview(showBackground = true)
-@Composable
-fun ProfileScreenPreview() {
-    SiakaTheme {
-        ProfileScreen()
-    }
-}
-

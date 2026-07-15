@@ -7,6 +7,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Singleton
 class RouteGenerator @Inject constructor() {
@@ -33,8 +35,8 @@ class RouteGenerator @Inject constructor() {
         // Generate waypoints in a circle
         for (i in 0 until numPoints) {
             val angle = 2 * Math.PI * i / numPoints
-            val lat = centerPoint.latitude + (radius * Math.sin(angle))
-            val lon = centerPoint.longitude + (radius * Math.cos(angle))
+            val lat = centerPoint.latitude + (radius * sin(angle))
+            val lon = centerPoint.longitude + (radius * cos(angle))
             waypoints.add(listOf(lon, lat)) // Note: ORS uses [lon, lat]
         }
         
@@ -50,10 +52,10 @@ class RouteGenerator @Inject constructor() {
             )
             
             if (response.isSuccessful) {
-                response.body()?.features?.firstOrNull()?.geometry?.coordinates?.map { coord ->
+                response.body()?.features?.firstOrNull()?.geometry?.coordinates?.map { cord ->
                     LocationPoint(
-                        latitude = coord[1],  // lat is second element
-                        longitude = coord[0]  // lon is first element
+                        latitude = cord[1],  // lat is the second element
+                        longitude = cord[0]  // lon is the first element
                     )
                 } ?: emptyList()
             } else {

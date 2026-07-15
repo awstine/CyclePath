@@ -46,6 +46,10 @@ sealed class Screen(
         iconRes = R.drawable.profile_outlined,
         selectedIconRes = R.drawable.profile_filled
     )
+    object RideHistory : Screen(
+        route = "ride_history",
+        title = "Ride History"
+    )
 
     companion object {
         val items = listOf(Map, Routes, Profile)

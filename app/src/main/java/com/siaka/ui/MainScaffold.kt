@@ -38,6 +38,7 @@ import com.siaka.ui.navigation.Screen
 import com.siaka.ui.screens.map.MapScreen
 import com.siaka.ui.screens.onboarding.OnboardingScreen
 import com.siaka.ui.screens.profile.ProfileScreen
+import com.siaka.ui.screens.profile.RideHistoryScreen
 import com.siaka.ui.screens.routes.RoutesScreen
 import com.siaka.ui.theme.SoftGreen
 
@@ -48,7 +49,9 @@ fun MainScaffold() {
     val currentDestination = navBackStackEntry?.destination
     
     // Hide bottom bar on Onboarding screen
-    val showBottomBar = currentDestination?.route != null && currentDestination.route != Screen.Onboarding.route
+    val showBottomBar = currentDestination?.route != null && 
+        currentDestination.route != Screen.Onboarding.route &&
+        currentDestination.route != Screen.RideHistory.route
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
@@ -81,7 +84,16 @@ fun MainScaffold() {
                     }
                 }) 
             }
-            composable(Screen.Profile.route) { ProfileScreen() }
+            composable(Screen.Profile.route) { 
+                ProfileScreen(onNavigateToRideHistory = {
+                    navController.navigate(Screen.RideHistory.route)
+                }) 
+            }
+            composable(Screen.RideHistory.route) {
+                RideHistoryScreen(onBack = {
+                    navController.popBackStack()
+                })
+            }
         }
 
         AnimatedVisibility(

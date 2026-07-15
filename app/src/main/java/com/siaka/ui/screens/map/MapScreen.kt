@@ -2,6 +2,7 @@ package com.siaka.ui.screens.map
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,7 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,8 +29,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +43,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,15 +65,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,12 +89,10 @@ import com.mapbox.maps.extension.compose.annotation.generated.PolylineAnnotation
 import com.mapbox.maps.viewannotation.geometry
 import com.mapbox.maps.viewannotation.viewAnnotationOptions
 import com.siaka.R
-import com.siaka.data.LocationPoint
 import com.siaka.data.MapUiState
 import com.siaka.ui.theme.DangerRed
 import com.siaka.ui.theme.DarkNavy
 import com.siaka.ui.theme.PrimaryDark
-import com.siaka.ui.theme.SiakaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,6 +155,7 @@ fun MapScreenContent(
     uiState: MapUiState,
     viewModel: MapViewModel
 ) {
+    val context = LocalContext.current
     val viewportState = rememberMapViewportState {
         setCameraOptions {
             zoom(12.0)
@@ -159,6 +167,7 @@ fun MapScreenContent(
 
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             snackbarHostState.showSnackbar(it)
             viewModel.onSnackbarDismissed()
         }
@@ -257,10 +266,32 @@ fun MapScreenContent(
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
             ) {
-                NavigationTopBanner(
-                    instruction = uiState.nextInstruction,
-                    distance = uiState.distanceToNextInstructionMeters
-                )
+                Column {
+                    NavigationTopBanner(
+                        instruction = uiState.nextInstruction,
+                        distance = uiState.distanceToNextInstructionMeters
+                    )
+                    
+                    // Route Progress Bar
+                    val progress = remember(uiState.remainingDistanceKm, uiState.totalRouteDistanceKm) {
+                        if (uiState.totalRouteDistanceKm > 0) {
+                            (1f - (uiState.remainingDistanceKm / uiState.totalRouteDistanceKm).toFloat()).coerceIn(0f, 1f)
+                        } else 0f
+                    }
+                    
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .shadow(2.dp, RoundedCornerShape(4.dp)),
+                        color = Color(0xFF4CAF50), // Nice green
+                        trackColor = Color.White.copy(alpha = 0.5f),
+                        strokeCap = StrokeCap.Round
+                    )
+                }
             }
 
             // 3. Search Bar (When Idle)
@@ -362,30 +393,82 @@ fun MapScreenContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Real-time Stats Dashboard
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            StatCard(
+                                label = "Speed",
+                                value = String.format("%.1f", uiState.currentSpeedKmh),
+                                unit = "km/h",
+                                icon = Icons.Default.Speed,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatCard(
+                                label = "Altitude",
+                                value = String.format("%.0f", uiState.altitudeMeters),
+                                unit = "m",
+                                icon = Icons.Default.Terrain,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatCard(
+                                label = "Time",
+                                value = formatElapsedTime(uiState.elapsedTimeSeconds),
+                                unit = "",
+                                icon = Icons.Default.Timer,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.Center
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // End Navigation Button (Primary)
+                            // Pause/Resume Button
+                            Button(
+                                onClick = viewModel::togglePause,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (uiState.isPaused) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp)
+                                    .shadow(8.dp, RoundedCornerShape(16.dp))
+                            ) {
+                                Icon(
+                                    imageVector = if (uiState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    if (uiState.isPaused) "Resume" else "Pause",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+
+                            // End Navigation Button
                             Button(
                                 onClick = viewModel::stopNavigation,
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .weight(1f)
                                     .height(56.dp)
-                                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-                                contentPadding = PaddingValues(horizontal = 16.dp)
+                                    .shadow(8.dp, RoundedCornerShape(16.dp))
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "End Navigation",
+                                    "End",
                                     color = Color.White,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    )
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
                         }
@@ -417,10 +500,228 @@ fun MapScreenContent(
                 isSaving = uiState.isSaving
             )
         }
+
+        if (uiState.showSummaryDialog) {
+            RideSummaryDialog(
+                distance = uiState.lastRideDistanceKm,
+                durationSeconds = uiState.lastRideDurationSeconds,
+                avgSpeed = uiState.lastRideAvgSpeedKmh,
+                onDismiss = viewModel::onDismissSummary
+            )
+        }
     }
 }
 
-// --- COMPOSE COMPONENTS ---
+@Composable
+fun StatCard(
+    label: String,
+    value: String,
+    unit: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = PrimaryDark,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                if (unit.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = unit,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun RideSummaryDialog(
+    distance: Double,
+    durationSeconds: Long,
+    avgSpeed: Double,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Ride Summary",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = PrimaryDark
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Great job! Here's how you did.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Stats Grid
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    SummaryStatItem(
+                        label = "Distance",
+                        value = String.format("%.2f", distance),
+                        unit = "km",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatItem(
+                        label = "Avg Speed",
+                        value = String.format("%.1f", avgSpeed),
+                        unit = "km/h",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    SummaryStatItem(
+                        label = "Time",
+                        value = formatElapsedTime(durationSeconds),
+                        unit = "",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatItem(
+                        label = "Elevation",
+                        value = "---", // Could track total elevation gain later
+                        unit = "m",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                HorizontalDivider(modifier = Modifier.padding(bottom = 24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Close")
+                    }
+                    
+                    Button(
+                        onClick = { /* Implement sharing */ },
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryDark)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SummaryStatItem(
+    label: String,
+    value: String,
+    unit: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xFFF5F5F7), RoundedCornerShape(20.dp))
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.Gray
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            if (unit.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 3.dp)
+                )
+            }
+        }
+    }
+}
+
+fun formatElapsedTime(seconds: Long): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return if (h > 0) {
+        String.format("%d:%02d:%02d", h, m, s)
+    } else {
+        String.format("%02d:%02d", m, s)
+    }
+}
 
 @Composable
 fun UserLocationMarker(isNavigating: Boolean, bearing: Float = 0f) {
