@@ -27,7 +27,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,14 +42,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.siaka.R
 import com.siaka.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    onNavigateToRideHistory: () -> Unit
+    onNavigateToRideHistory: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToHelpSupport: () -> Unit,
+    onNavigateToPersonalInfo: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
+    val userName by viewModel.userName.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -64,97 +75,115 @@ fun ProfileScreen(
             )
         }
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.fetchUserProfile() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Background)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 100.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
         ) {
-            // Profile Header
-            ProfileHeader()
-
-            Spacer(modifier = Modifier.height(19.dp))
-
-            // Account Section
-            SectionHeader(title = "Account Settings")
-            
             Column(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White)
+                    .fillMaxSize()
+                    .background(Background)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 90.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
             ) {
-                ProfileOptionItem(
-                    icon = ProfileIcon.Painter(painterResource(R.drawable.profile_outlined)),
-                    title = "Personal Information",
-                    subtitle = "Update your name and email",
-                    onClick = {}
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+                // Profile Header
+                ProfileHeader(name = userName)
 
-                ProfileOptionItem(
-                    icon = ProfileIcon.Vector(Icons.Default.History),
-                    title = "Ride History",
-                    subtitle = "Your previous journeys",
-                    onClick = onNavigateToRideHistory
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.weight(1.5f))
+
+                // Account Section
+                SectionHeader(title = "Account Settings")
+                
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.White)
+                ) {
+                    ProfileOptionItem(
+                        icon = ProfileIcon.Painter(painterResource(R.drawable.profile_outlined)),
+                        title = "Personal Information",
+                        subtitle = "Update your name and email",
+                        onClick = onNavigateToPersonalInfo
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+
+                    ProfileOptionItem(
+                        icon = ProfileIcon.Vector(Icons.Default.History),
+                        title = "Ride History",
+                        subtitle = "Your previous journeys",
+                        onClick = onNavigateToRideHistory
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Support & Preferences
+                SectionHeader(title = "Support & Preferences")
+                
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.White)
+                ) {
+                    ProfileOptionItem(
+                        icon = ProfileIcon.Vector(Icons.Default.Settings),
+                        title = "App Settings",
+                        subtitle = "Notification and Appearance",
+                        onClick = onNavigateToSettings
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+
+                    ProfileOptionItem(
+                        icon = ProfileIcon.Vector(Icons.AutoMirrored.Filled.Help),
+                        title = "Help & Support",
+                        subtitle = "Get to know how to use the app",
+                        onClick = onNavigateToHelpSupport
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                ) {
+                    // Logout Button
+                    Button(
+                        onClick = { /* TODO: Logout */ },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DangerRed.copy(alpha = 0.1f),
+                            contentColor = DangerRed
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = null
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.log_out),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Log Out",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Support & Preferences
-            SectionHeader(title = "Support & Preferences")
-            
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White)
-            ) {
-                ProfileOptionItem(
-                    icon = ProfileIcon.Vector(Icons.Default.Settings),
-                    title = "App Settings",
-                    subtitle = "Notification and Appearance",
-                    onClick = {}
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
-
-                ProfileOptionItem(
-                    icon = ProfileIcon.Vector(Icons.AutoMirrored.Filled.Help),
-                    title = "Help & Support",
-                    subtitle = "Get assistance from our team",
-                    onClick = {}
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Logout Button
-            Button(
-                onClick = { /* TODO: Logout */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DangerRed.copy(alpha = 0.1f),
-                    contentColor = DangerRed
-                ),
-                shape = RoundedCornerShape(16.dp),
-                elevation = null
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.log_out),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Log Out", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-            }
-            
-            Spacer(modifier = Modifier.height(78.dp))
         }
     }
 }
@@ -163,7 +192,7 @@ fun ProfileScreen(
 fun SectionHeader(title: String) {
     Text(
         text = title,
-        modifier = Modifier.padding(start = 32.dp, bottom = 12.dp),
+        modifier = Modifier.padding(start = 24.dp, bottom = 8.dp),
         style = MaterialTheme.typography.labelLarge.copy(
             fontWeight = FontWeight.Bold,
             color = Color.Gray,
@@ -173,11 +202,11 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun ProfileHeader() {
+fun ProfileHeader(name: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 8.dp),
+            .padding(top = 8.dp, bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -223,10 +252,10 @@ fun ProfileHeader() {
             }
         }
         
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         Text(
-            text = "Siaka Rider",
+            text = name,
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
             color = PrimaryLight
         )
@@ -244,7 +273,7 @@ fun ProfileOptionItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 20.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
@@ -287,4 +316,17 @@ fun ProfileOptionItem(
 sealed class ProfileIcon {
     data class Vector(val imageVector: ImageVector) : ProfileIcon()
     data class Painter(val painter: androidx.compose.ui.graphics.painter.Painter) : ProfileIcon()
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfileScreenPreview() {
+    SiakaTheme {
+        ProfileScreen(
+            onNavigateToRideHistory = {},
+            onNavigateToSettings = {},
+            onNavigateToHelpSupport = {},
+            onNavigateToPersonalInfo = {}
+        )
+    }
 }

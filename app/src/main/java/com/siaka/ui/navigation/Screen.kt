@@ -26,6 +26,14 @@ sealed class Screen(
         "Onboarding",
         iconVector = Icons.Outlined.Map,
         selectedIconVector = Icons.Default.Map)
+    object Login : Screen(
+        route = "login",
+        title = "Login"
+    )
+    object SignUp : Screen(
+        route = "signup",
+        title = "Sign Up"
+    )
     object Map : Screen(
         route = "map?routeId={routeId}",
         title = "Map",
@@ -49,6 +57,18 @@ sealed class Screen(
     object RideHistory : Screen(
         route = "ride_history",
         title = "Ride History"
+    )
+    object PersonalInfo : Screen(
+        route = "personal_info",
+        title = "Personal Information"
+    )
+    object Settings : Screen(
+        route = "settings",
+        title = "App Settings"
+    )
+    object HelpSupport : Screen(
+        route = "help_support",
+        title = "Help & Support"
     )
 
     companion object {

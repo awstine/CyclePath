@@ -23,12 +23,14 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -37,24 +39,41 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.siaka.data.repository.AuthRepository
 import com.siaka.ui.navigation.Screen
+import com.siaka.ui.screens.auth.LoginScreen
+import com.siaka.ui.screens.auth.SignUpScreen
 import com.siaka.ui.screens.map.MapScreen
 import com.siaka.ui.screens.onboarding.OnboardingScreen
 import com.siaka.ui.screens.profile.ProfileScreen
 import com.siaka.ui.screens.profile.RideHistoryScreen
+import com.siaka.ui.screens.profile.PersonalInfoScreen
 import com.siaka.ui.screens.routes.RoutesScreen
+import com.siaka.ui.screens.settings.SettingsScreen
+import com.siaka.ui.screens.help.HelpSupportScreen
 import com.siaka.ui.theme.SoftGreen
 
 @Composable
-fun MainScaffold() {
+fun MainScaffold(
+    authViewModel: com.siaka.ui.screens.auth.AuthViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    // Hide bottom bar on Onboarding screen
-    val showBottomBar = currentDestination?.route != null && 
+    // Check if user is already logged in (This should ideally be in a splash screen or a separate state)
+    // For now, we'll use a simple check
+    val startDestination = Screen.Onboarding.route
+
+    // Hide bottom bar on Onboarding, Login, and SignUp screens
+    val showBottomBar = currentDestination?.route != null &&
         currentDestination.route != Screen.Onboarding.route &&
-        currentDestination.route != Screen.RideHistory.route
+        currentDestination.route != Screen.Login.route &&
+        currentDestination.route != Screen.SignUp.route &&
+        currentDestination.route != Screen.RideHistory.route &&
+        currentDestination.route != Screen.PersonalInfo.route &&
+        currentDestination.route != Screen.Settings.route &&
+        currentDestination.route != Screen.HelpSupport.route
 
     Box(
         modifier = Modifier
@@ -71,10 +90,42 @@ fun MainScaffold() {
         ) {
             composable(Screen.Onboarding.route) {
                 OnboardingScreen(onFinish = {
-                    navController.navigate(Screen.Map.route) {
+                    navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 })
+            }
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(Screen.Map.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onRegisterClick = {
+                        navController.navigate(Screen.SignUp.route)
+                    },
+                    onForgotPasswordClick = {
+                        // TODO
+                    }
+                )
+            }
+            composable(Screen.SignUp.route) {
+                SignUpScreen(
+                    onSignUpSuccess = {
+                        navController.navigate(Screen.Map.route) {
+                            popUpTo(Screen.SignUp.route) { inclusive = true }
+                        }
+                    },
+                    onLoginClick = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.SignUp.route) { inclusive = true }
+                        }
+                    },
+                    onTermsClick = {
+                        // TODO
+                    }
+                )
             }
             composable(
                 route = Screen.Map.route,
@@ -95,12 +146,38 @@ fun MainScaffold() {
                 }) 
             }
             composable(Screen.Profile.route) { 
-                ProfileScreen(onNavigateToRideHistory = {
-                    navController.navigate(Screen.RideHistory.route)
-                }) 
+                ProfileScreen(
+                    onNavigateToRideHistory = {
+                        navController.navigate(Screen.RideHistory.route)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
+                    },
+                    onNavigateToHelpSupport = {
+                        navController.navigate(Screen.HelpSupport.route)
+                    },
+                    onNavigateToPersonalInfo = {
+                        navController.navigate(Screen.PersonalInfo.route)
+                    }
+                ) 
             }
             composable(Screen.RideHistory.route) {
                 RideHistoryScreen(onBack = {
+                    navController.popBackStack()
+                })
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(onBack = {
+                    navController.popBackStack()
+                })
+            }
+            composable(Screen.HelpSupport.route) {
+                HelpSupportScreen(onBack = {
+                    navController.popBackStack()
+                })
+            }
+            composable(Screen.PersonalInfo.route) {
+                PersonalInfoScreen(onBack = {
                     navController.popBackStack()
                 })
             }
