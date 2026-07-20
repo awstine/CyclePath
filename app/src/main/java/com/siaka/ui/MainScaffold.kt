@@ -22,6 +22,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.siaka.data.repository.AuthRepository
 import com.siaka.ui.navigation.Screen
+import com.siaka.ui.screens.auth.AuthViewModel
 import com.siaka.ui.screens.auth.LoginScreen
 import com.siaka.ui.screens.auth.SignUpScreen
 import com.siaka.ui.screens.map.MapScreen
@@ -55,15 +57,19 @@ import com.siaka.ui.theme.SoftGreen
 
 @Composable
 fun MainScaffold(
-    authViewModel: com.siaka.ui.screens.auth.AuthViewModel = hiltViewModel()
+    mainViewModel: MainViewModel,
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    // Check if user is already logged in (This should ideally be in a splash screen or a separate state)
-    // For now, we'll use a simple check
-    val startDestination = Screen.Onboarding.route
+    val startDestination by mainViewModel.startDestination.collectAsState()
+
+    if (startDestination == null) {
+        // Show a splash screen or loading state while determining start destination
+        return
+    }
 
     // Hide bottom bar on Onboarding, Login, and SignUp screens
     val showBottomBar = currentDestination?.route != null &&
@@ -85,11 +91,12 @@ fun MainScaffold(
         
         NavHost(
             navController = navController,
-            startDestination = Screen.Onboarding.route,
+            startDestination = startDestination!!,
             modifier = Modifier.fillMaxSize()
         ) {
             composable(Screen.Onboarding.route) {
                 OnboardingScreen(onFinish = {
+                    mainViewModel.completeOnboarding()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -158,6 +165,11 @@ fun MainScaffold(
                     },
                     onNavigateToPersonalInfo = {
                         navController.navigate(Screen.PersonalInfo.route)
+                    },
+                    onLogout = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 ) 
             }

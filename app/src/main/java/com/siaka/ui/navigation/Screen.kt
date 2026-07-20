@@ -1,14 +1,8 @@
 package com.siaka.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.DirectionsBike
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.DirectionsBike
-import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
 import com.siaka.R
@@ -72,6 +66,6 @@ sealed class Screen(
     )
 
     companion object {
-        val items = listOf(Map, Routes, Profile)
+        val items: List<Screen> by lazy { listOf(Map, Routes, Profile) }
     }
 }
