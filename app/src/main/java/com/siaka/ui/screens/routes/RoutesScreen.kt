@@ -147,7 +147,7 @@ fun RoutesScreen(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(
                     start = 16.dp, 
-                    top = 16.dp, 
+                    top = 12.dp,
                     end = 16.dp, 
                     bottom = 16.dp + navBarHeight + navigationBarsPadding
                 ),

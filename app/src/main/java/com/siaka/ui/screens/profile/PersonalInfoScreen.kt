@@ -83,7 +83,6 @@ fun PersonalInfoScreen(
             Button(
                 onClick = { 
                     viewModel.updatePersonalInformation(name)
-                    viewModel.fetchUserProfile() // Force immediate refresh of internal state
                     onBack()
                 },
                 modifier = Modifier

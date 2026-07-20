@@ -58,6 +58,8 @@ dependencies {
     implementation(libs.osmdroid)
     implementation(libs.accompanist.permissions)
     implementation (libs.androidx.core.splashscreen)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.coil.compose)
 
     // Firebase
     implementation(platform(libs.firebase.bom))

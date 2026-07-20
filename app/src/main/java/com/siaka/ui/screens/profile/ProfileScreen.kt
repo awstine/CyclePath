@@ -1,5 +1,8 @@
 package com.siaka.ui.screens.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,26 +29,34 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.DarkGray
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.siaka.R
 import com.siaka.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,10 +65,30 @@ fun ProfileScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToHelpSupport: () -> Unit,
     onNavigateToPersonalInfo: () -> Unit,
+    onLogout: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val userName by viewModel.userName.collectAsState()
+    val profileImageUrl by viewModel.profileImageUrl.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+
+    var showBottomSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            uri?.let {
+                viewModel.updateProfileImage(it.toString())
+            }
+            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                if (!sheetState.isVisible) {
+                    showBottomSheet = false
+                }
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -90,7 +122,11 @@ fun ProfileScreen(
                     .padding(bottom = 90.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
             ) {
                 // Profile Header
-                ProfileHeader(name = userName)
+                ProfileHeader(
+                    name = userName,
+                    profileImageUrl = profileImageUrl,
+                    onEditClick = { showBottomSheet = true }
+                )
 
                 Spacer(modifier = Modifier.weight(1.5f))
 
@@ -158,7 +194,10 @@ fun ProfileScreen(
                 ) {
                     // Logout Button
                     Button(
-                        onClick = { /* TODO: Logout */ },
+                        onClick = { 
+                            viewModel.logout()
+                            onLogout()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -186,6 +225,26 @@ fun ProfileScreen(
             }
         }
     }
+
+    if (showBottomSheet) {
+        EditProfileImageBottomSheet(
+            sheetState = sheetState,
+            onDismiss = { showBottomSheet = false },
+            onSelectImage = {
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onRemoveImage = {
+                viewModel.updateProfileImage("") // Or handle removal logic
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    if (!sheetState.isVisible) {
+                        showBottomSheet = false
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -202,7 +261,11 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun ProfileHeader(name: String) {
+fun ProfileHeader(
+    name: String,
+    profileImageUrl: String? = null,
+    onEditClick: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -217,16 +280,26 @@ fun ProfileHeader(name: String) {
             Surface(
                 modifier = Modifier
                     .size(120.dp)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable { onEditClick() },
                 color = LightBlue.copy(alpha = 0.4f),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.profile_filled),
-                        contentDescription = null,
-                        modifier = Modifier.size(70.dp),
-                        tint = DarkGray.copy(alpha = 0.7f)
-                    )
+                    if (!profileImageUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = profileImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.profile_filled),
+                            contentDescription = null,
+                            modifier = Modifier.size(70.dp),
+                            tint = DarkGray.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
             
@@ -236,7 +309,7 @@ fun ProfileHeader(name: String) {
                     .size(36.dp)
                     .offset(x = (-4).dp, y = (-4).dp)
                     .clip(CircleShape)
-                    .clickable { },
+                    .clickable { onEditClick() },
                 color = Secondary,
                 contentColor = Color.White,
                 tonalElevation = 4.dp,
@@ -313,6 +386,83 @@ fun ProfileOptionItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditProfileImageBottomSheet(
+    sheetState: SheetState,
+    onDismiss: () -> Unit,
+    onSelectImage: () -> Unit,
+    onRemoveImage: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Text(
+                text = "Profile Photo",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { onSelectImage() }
+                ) {
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = SoftGreen.copy(alpha = 0.2f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = SoftGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Gallery", style = MaterialTheme.typography.labelLarge)
+                }
+                
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { onRemoveImage() }
+                ) {
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = DangerRed.copy(alpha = 0.1f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.delete),
+                                contentDescription = null,
+                                tint = DangerRed,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Remove", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
 sealed class ProfileIcon {
     data class Vector(val imageVector: ImageVector) : ProfileIcon()
     data class Painter(val painter: androidx.compose.ui.graphics.painter.Painter) : ProfileIcon()
@@ -326,7 +476,8 @@ fun ProfileScreenPreview() {
             onNavigateToRideHistory = {},
             onNavigateToSettings = {},
             onNavigateToHelpSupport = {},
-            onNavigateToPersonalInfo = {}
+            onNavigateToPersonalInfo = {},
+            onLogout = {}
         )
     }
 }

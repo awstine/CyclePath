@@ -7,10 +7,12 @@ import com.siaka.data.local.CompletedRideDao
 import com.siaka.data.repository.AuthRepository
 import com.siaka.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,11 +30,37 @@ class ProfileViewModel @Inject constructor(
     private val _userEmail = MutableStateFlow("")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
+    private val _profileImageUrl = MutableStateFlow<String?>(null)
+    val profileImageUrl: StateFlow<String?> = _profileImageUrl.asStateFlow()
+
     private val _isRefreshing = MutableStateFlow(value = false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private var profileJob: Job? = null
+
     init {
-        fetchUserProfile()
+        observeUserProfile()
+    }
+
+    private fun observeUserProfile() {
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            authRepository.currentUser.collectLatest { user ->
+                if (user != null) {
+                    userRepository.getUserProfileFlow(user.uid).collect { data ->
+                        data?.let {
+                            _userName.value = (it["fullName"] as? String) ?: "Siaka Rider"
+                            _userEmail.value = (it["email"] as? String) ?: (user.email ?: "")
+                            _profileImageUrl.value = it["profileImageUrl"] as? String
+                        }
+                    }
+                } else {
+                    _userName.value = "Siaka Rider"
+                    _userEmail.value = ""
+                    _profileImageUrl.value = null
+                }
+            }
+        }
     }
 
     fun fetchUserProfile() {
@@ -44,9 +72,8 @@ class ProfileViewModel @Inject constructor(
                     data?.let {
                         _userName.value = (it["fullName"] as? String) ?: "Siaka Rider"
                         _userEmail.value = (it["email"] as? String) ?: (user.email ?: "")
+                        _profileImageUrl.value = it["profileImageUrl"] as? String
                     }
-                }.onFailure {
-                    // Handle error if needed
                 }
                 _isRefreshing.value = false
             }
@@ -67,6 +94,20 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    fun updateProfileImage(url: String) {
+        val currentUser = authRepository.currentUser.value
+        currentUser?.let { user ->
+            viewModelScope.launch {
+                val updates = mapOf(
+                    "profileImageUrl" to url
+                )
+                userRepository.updateProfile(user.uid, updates).onSuccess {
+                    _profileImageUrl.value = url
+                }
+            }
+        }
+    }
+
     val rideHistory: StateFlow<List<CompletedRide>> = completedRideDao.getAllCompletedRides()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -75,4 +116,8 @@ class ProfileViewModel @Inject constructor(
 
     val rideCount: StateFlow<Int> = completedRideDao.getRideCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun logout() {
+        authRepository.logout()
+    }
 }
