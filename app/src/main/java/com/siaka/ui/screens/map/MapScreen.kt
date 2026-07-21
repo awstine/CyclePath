@@ -172,7 +172,7 @@ fun MapScreenContent(
         uiState.snackbarMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             snackbarHostState.showSnackbar(it)
-            viewModel.onSnackbarDismissed()
+            viewModel.clearSnackbar()
         }
     }
 
@@ -381,7 +381,7 @@ fun MapScreenContent(
                     RouteActionButtons(
                         onRegenerate = viewModel::onShowDistanceDialog,
                         onStart = viewModel::startNavigation,
-                        onSave = viewModel::onShowSaveRouteDialog,
+                        onSave = viewModel::showSaveRouteDialog,
                         onClose = viewModel::clearRoute
                     )
                 }
@@ -487,7 +487,7 @@ fun MapScreenContent(
         if (uiState.showDistanceDialog) {
             DistanceInputDialog(
                 distance = uiState.distanceInput,
-                onDistanceChange = viewModel::onDistanceInputChange,
+                onDistanceChange = viewModel::onDistanceChange,
                 onConfirm = viewModel::generateRoute,
                 onDismiss = viewModel::onDismissDistanceDialog
             )
@@ -496,9 +496,9 @@ fun MapScreenContent(
         if (uiState.showSaveRouteDialog) {
             SaveRouteDialog(
                 routeName = uiState.routeNameInput,
-                onRouteNameChange = viewModel::onRouteNameInputChange,
+                onRouteNameChange = viewModel::onRouteNameChange,
                 onConfirm = viewModel::saveRoute,
-                onDismiss = viewModel::onDismissSaveRouteDialog,
+                onDismiss = viewModel::dismissSaveRouteDialog,
                 isSaving = uiState.isSaving
             )
         }
@@ -508,7 +508,7 @@ fun MapScreenContent(
                 distance = uiState.lastRideDistanceKm,
                 durationSeconds = uiState.lastRideDurationSeconds,
                 avgSpeed = uiState.lastRideAvgSpeedKmh,
-                onDismiss = viewModel::onDismissSummary
+                onDismiss = viewModel::dismissSummary
             )
         }
     }

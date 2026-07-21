@@ -48,41 +48,85 @@ class MapboxRouteGenerator @Inject constructor(
     suspend fun generateLoopRoute(
         centerPoint: LocationPoint,
         targetDistanceKm: Double
-    ): RouteData? = withContext(Dispatchers.IO) {
+    ): RouteResult = withContext(Dispatchers.IO) {
         try {
+            Log.i(TAG, "generateLoopRoute: START. Center=${centerPoint.latitude},${centerPoint.longitude}, Target=${targetDistanceKm}km")
+            
+            if (accessToken.isBlank()) {
+                Log.e(TAG, "generateLoopRoute: MAPBOX ACCESS TOKEN IS EMPTY!")
+                return@withContext RouteResult.Error("API Key is missing in build")
+            }
+
             val waypoints = generateCircularWaypoints(centerPoint, targetDistanceKm)
             val coordinatesString = waypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
+            Log.i(TAG, "generateLoopRoute: Generated ${waypoints.size} waypoints. Coords: $coordinatesString")
 
-            val response = routingService.getCyclingRoute(
-                coordinates = coordinatesString,
-                accessToken = accessToken
-            )
+            val response = try {
+                routingService.getCyclingRoute(
+                    coordinates = coordinatesString,
+                    accessToken = accessToken
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "generateLoopRoute: Network Call failed", e)
+                return@withContext RouteResult.Error("Network error: ${e.localizedMessage}")
+            }
 
-            if (response.isSuccessful && response.body()?.code == "Ok") {
-                val route = response.body()?.routes?.firstOrNull()
-                if (route != null) {
-                    val points = decodePolyline(route.geometry, 6)
-                    val steps = route.legs?.flatMap { leg ->
-                        leg.steps?.map { step ->
-                            mapToRouteStep(step)
+            Log.i(TAG, "generateLoopRoute: API RESPONSE CODE: ${response.code()}")
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                Log.i(TAG, "generateLoopRoute: API Body Code: ${body?.code}")
+                if (body?.code == "Ok") {
+                    val route = body.routes?.firstOrNull()
+                    if (route != null) {
+                        Log.i(TAG, "generateLoopRoute: Found route. Distance=${route.distance}m, Duration=${route.duration}s")
+                        val points = decodePolyline(route.geometry, 6)
+                        val steps = route.legs?.flatMap { leg ->
+                            leg.steps?.map { step ->
+                                mapToRouteStep(step)
+                            } ?: emptyList()
                         } ?: emptyList()
-                    } ?: emptyList()
-                    
-                    return@withContext RouteData(
-                        points = points,
-                        steps = steps,
-                        totalDistanceKm = route.distance / 1000.0,
-                        totalDurationMinutes = (route.duration / 60.0).toInt()
-                    )
+                        
+                        Log.i(TAG, "generateLoopRoute: Decoded ${points.size} points")
+                        
+                        return@withContext RouteResult.Success(
+                            RouteData(
+                                points = points,
+                                steps = steps,
+                                totalDistanceKm = route.distance / 1000.0,
+                                totalDurationMinutes = (route.duration / 60.0).toInt()
+                            )
+                        )
+                    } else {
+                        Log.e(TAG, "generateLoopRoute: Body OK but NO ROUTES in list")
+                        return@withContext RouteResult.Error("No routes found in this area")
+                    }
+                } else {
+                    Log.e(TAG, "generateLoopRoute: Body code NOT Ok: ${body?.code}")
+                    return@withContext RouteResult.Error("Mapbox Error: ${body?.code ?: "Unknown"}")
+                }
+            } else {
+                val errorMsg = response.errorBody()?.string() ?: ""
+                Log.e(TAG, "generateLoopRoute: API Error (${response.code()}): $errorMsg")
+                
+                return@withContext when(response.code()) {
+                    401 -> RouteResult.Error("Invalid API Key")
+                    403 -> RouteResult.Error("API Key restricted or blocked")
+                    422 -> RouteResult.Error("Invalid route request parameters")
+                    else -> RouteResult.Error("Server error (${response.code()})")
                 }
             }
-            
-            null
         } catch (e: Exception) {
-            Log.e(TAG, "Mapbox Route generation failed", e)
-            null
+            Log.e(TAG, "generateLoopRoute: EXCEPTION", e)
+            return@withContext RouteResult.Error("Internal Error: ${e.localizedMessage}")
         }
     }
+
+sealed class RouteResult {
+    data class Success(val data: RouteData) : RouteResult()
+    data class Error(val message: String) : RouteResult()
+}
+
 
     private fun mapToRouteStep(step: MapboxStep): RouteStep {
         val maneuver = step.maneuver
