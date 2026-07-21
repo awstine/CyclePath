@@ -7,42 +7,42 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class MapboxRouteResponse(
-    val code: String,
-    val routes: List<MapboxRoute>?,
-    val waypoints: List<MapboxWaypoint>?
+    @SerializedName("code") val code: String,
+    @SerializedName("routes") val routes: List<MapboxRoute>?,
+    @SerializedName("waypoints") val waypoints: List<MapboxWaypoint>?
 )
 
 data class MapboxRoute(
-    val distance: Double,
-    val duration: Double,
-    val geometry: String, // Encoded polyline
-    val legs: List<MapboxLeg>?
+    @SerializedName("distance") val distance: Double,
+    @SerializedName("duration") val duration: Double,
+    @SerializedName("geometry") val geometry: String, // Encoded polyline
+    @SerializedName("legs") val legs: List<MapboxLeg>?
 )
 
 data class MapboxLeg(
-    val distance: Double,
-    val duration: Double,
-    val summary: String,
-    val steps: List<MapboxStep>?
+    @SerializedName("distance") val distance: Double,
+    @SerializedName("duration") val duration: Double,
+    @SerializedName("summary") val summary: String,
+    @SerializedName("steps") val steps: List<MapboxStep>?
 )
 
 data class MapboxStep(
-    val distance: Double,
-    val duration: Double,
-    val geometry: String,
-    val name: String,
+    @SerializedName("distance") val distance: Double,
+    @SerializedName("duration") val duration: Double,
+    @SerializedName("geometry") val geometry: String,
+    @SerializedName("name") val name: String,
     @SerializedName("maneuver") val maneuver: MapboxManeuver
 )
 
 data class MapboxManeuver(
-    val instruction: String,
-    val type: String,
-    val modifier: String?
+    @SerializedName("instruction") val instruction: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("modifier") val modifier: String?
 )
 
 data class MapboxWaypoint(
-    val location: List<Double>,
-    val name: String
+    @SerializedName("location") val location: List<Double>,
+    @SerializedName("name") val name: String
 )
 
 interface MapboxRoutingService {

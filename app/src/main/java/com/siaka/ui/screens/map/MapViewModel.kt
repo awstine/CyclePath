@@ -10,6 +10,8 @@ import com.siaka.data.MapboxRouteGenerator
 import com.siaka.data.OfflineMapManager
 import com.siaka.data.local.RouteDao
 import com.siaka.data.local.SavedRoute
+import com.siaka.data.local.CompletedRide
+import com.siaka.data.local.CompletedRideDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -24,7 +26,7 @@ class MapViewModel @Inject constructor(
     private val locationManager: LocationManager,
     private val routeGenerator: MapboxRouteGenerator,
     private val routeDao: RouteDao,
-    private val completedRideDao: com.siaka.data.local.CompletedRideDao,
+    private val completedRideDao: CompletedRideDao,
     private val offlineMapManager: OfflineMapManager
 ) : ViewModel() {
 
@@ -47,138 +49,46 @@ class MapViewModel @Inject constructor(
                 _uiState.update { it.copy(offlineDownloadProgress = progress) }
             }
         }
-        viewModelScope.launch {
-            offlineMapManager.isDownloading.collect { isDownloading ->
-                _uiState.update { it.copy(isOfflineDownloading = isDownloading) }
-            }
-        }
     }
 
     fun onPermissionResult(isGranted: Boolean) {
-        _uiState.update {
-            it.copy(
-                isLocationPermissionGranted = isGranted,
-                isMyLocationEnabled = isGranted
-            )
-        }
+        _uiState.update { it.copy(isLocationPermissionGranted = isGranted, isMyLocationEnabled = isGranted) }
         if (isGranted) {
-            startLocationTracking()
+            startLocationUpdates()
         }
     }
 
-    private fun startLocationTracking() {
-        // Prevent launching duplicate collection jobs
+    private fun startLocationUpdates() {
         locationJob?.cancel()
-
         locationJob = viewModelScope.launch {
-            locationManager.getLocationUpdates(intervalMillis = 2000).collect { location ->
-                val userPoint = LocationPoint(
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    bearing = if (location.hasBearing()) location.bearing else null
-                )
+            locationManager.getLocationUpdates().collect { location ->
+                val point = LocationPoint(location.latitude, location.longitude, location.bearing)
+                _uiState.update { it.copy(userLocation = point) }
                 
-                val speedKmh = if (location.hasSpeed()) location.speed * 3.6 else 0.0
-                val altitude = if (location.hasAltitude()) location.altitude else 0.0
+                // Auto-center on first location if needed
+                if (_uiState.value.shouldCenterOnLocation) {
+                    _uiState.update { it.copy(shouldCenterOnLocation = false) }
+                }
 
-                _uiState.update { state ->
-                    if (state.isPaused) return@update state
-                    
-                    val distanceDeltaKm = lastTrackedLocation?.let { 
-                        calculateDistance(it, userPoint) / 1000.0 
-                    } ?: 0.0
-                    
-                    // Only count movement if speed is > 1km/h to avoid GPS jitter while stationary
-                    val validDistanceDelta = if (speedKmh > 1.0) distanceDeltaKm else 0.0
-                    lastTrackedLocation = userPoint
-
-                    var updatedState = state.copy(
-                        userLocation = userPoint,
-                        currentSpeedKmh = speedKmh,
-                        altitudeMeters = altitude,
-                        totalDistanceCoveredKm = state.totalDistanceCoveredKm + validDistanceDelta
-                    )
-                    if (state.isNavigating) {
-                        updatedState = updateNavigationDetails(updatedState, userPoint)
-                    }
-                    updatedState
+                // Auto-download offline maps for current area once
+                if (!hasAutoDownloaded) {
+                    hasAutoDownloaded = true
+                    // viewModelScope.launch { offlineMapManager.downloadRegion(location) }
                 }
             }
         }
     }
 
-    private fun startStatsTimer() {
-        statsJob?.cancel()
-        startTimeMillis = System.currentTimeMillis()
-        statsJob = viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(1000)
-                if (!_uiState.value.isPaused) {
-                    val elapsed = _uiState.value.elapsedTimeSeconds + 1
-                    _uiState.update { it.copy(elapsedTimeSeconds = elapsed) }
-                }
-            }
-        }
-    }
-
-    fun togglePause() {
-        _uiState.update { it.copy(isPaused = !it.isPaused) }
-    }
-
-    private fun updateNavigationDetails(state: MapUiState, userLocation: LocationPoint): MapUiState {
-        val points = state.generatedRoutePoints
-        val steps = state.routeSteps
-        if (points.isEmpty() || steps.isEmpty()) return state
-
-        // 1. Find the next instruction
-        val nextStep = steps.firstOrNull { step ->
-            calculateDistance(userLocation, step.location) > 30 
-        } ?: steps.last()
-
-        val distanceToNext = calculateDistance(userLocation, nextStep.location).toInt()
-
-        // 2. Calculate REAL remaining distance to finish
-        // Find the index of the point on the route closest to the user
-        var closestIdx = 0
-        var minDistance = Double.MAX_VALUE
-        points.forEachIndexed { index, point ->
-            val d = calculateDistance(userLocation, point)
-            if (d < minDistance) {
-                minDistance = d
-                closestIdx = index
-            }
-        }
-
-        // Sum distance from user to the closest point, then from there to the end
-        var remainingMeters = calculateDistance(userLocation, points[closestIdx])
-        for (i in closestIdx until points.size - 1) {
-            remainingMeters += calculateDistance(points[i], points[i + 1])
-        }
-
-        return state.copy(
-            nextInstruction = nextStep.instruction,
-            distanceToNextInstructionMeters = distanceToNext,
-            remainingDistanceKm = remainingMeters / 1000.0
-        )
-    }
-
-    private fun calculateDistance(p1: LocationPoint, p2: LocationPoint): Double {
-        val r = 6371e3 // Earth radius in meters
-        val phi1 = Math.toRadians(p1.latitude)
-        val phi2 = Math.toRadians(p2.latitude)
-        val dPhi = Math.toRadians(p2.latitude - p1.latitude)
-        val dLambda = Math.toRadians(p2.longitude - p1.longitude)
-
-        val a = sin(dPhi / 2) * sin(dPhi / 2) +
-                cos(phi1) * cos(phi2) *
-                sin(dLambda / 2) * sin(dLambda / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return r * c
-    }
-
-    fun onDistanceInputChange(distance: String) {
+    fun onDistanceChange(distance: String) {
         _uiState.update { it.copy(distanceInput = distance) }
+    }
+
+    fun onCenterOnLocationRequested() {
+        _uiState.update { it.copy(shouldCenterOnLocation = true) }
+    }
+
+    fun onMapCentered() {
+        _uiState.update { it.copy(shouldCenterOnLocation = false) }
     }
 
     fun onShowDistanceDialog() {
@@ -189,81 +99,61 @@ class MapViewModel @Inject constructor(
         _uiState.update { it.copy(showDistanceDialog = false) }
     }
 
-    fun onCenterOnLocationRequested() {
-        _uiState.update { it.copy(shouldCenterOnLocation = true) }
-    }
-
-    fun onShowSaveRouteDialog() {
-        _uiState.update { it.copy(showSaveRouteDialog = true, routeNameInput = "") }
-    }
-
-    fun onDismissSaveRouteDialog() {
-        _uiState.update { it.copy(showSaveRouteDialog = false) }
-    }
-
-    fun onRouteNameInputChange(name: String) {
-        _uiState.update { it.copy(routeNameInput = name) }
-    }
-
-    fun onMapCentered() {
-        _uiState.update { it.copy(shouldCenterOnLocation = false) }
-    }
-
     fun startNavigation() {
-        if (_uiState.value.generatedRoutePoints.isNotEmpty()) {
-            lastTrackedLocation = _uiState.value.userLocation
-            _uiState.update { 
-                it.copy(
-                    isNavigating = true, 
-                    isPaused = false,
-                    shouldCenterOnLocation = true,
-                    elapsedTimeSeconds = 0,
-                    totalDistanceCoveredKm = 0.0,
-                    totalRouteDistanceKm = it.remainingDistanceKm
-                ) 
-            }
-            startStatsTimer()
-        }
+        if (_uiState.value.generatedRoutePoints.isEmpty()) return
+        
+        _uiState.update { it.copy(isNavigating = true, isPaused = false, elapsedTimeSeconds = 0) }
+        startTimeMillis = System.currentTimeMillis()
+        startStatsTracking()
     }
 
     fun stopNavigation() {
-        statsJob?.cancel()
-        val currentState = _uiState.value
-        val avgSpeed = if (currentState.elapsedTimeSeconds > 0) {
-            currentState.totalDistanceCoveredKm / (currentState.elapsedTimeSeconds / 3600.0)
-        } else 0.0
+        _uiState.update { it.copy(isNavigating = false, showSummaryDialog = true) }
+        stopStatsTracking()
+        saveCompletedRide()
+    }
 
+    fun togglePause() {
+        _uiState.update { it.copy(isPaused = !it.isPaused) }
+    }
+
+    private fun startStatsTracking() {
+        statsJob?.cancel()
+        statsJob = viewModelScope.launch {
+            while (true) {
+                if (!_uiState.value.isPaused) {
+                    _uiState.update { it.copy(elapsedTimeSeconds = (System.currentTimeMillis() - startTimeMillis) / 1000) }
+                }
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+    }
+
+    private fun stopStatsTracking() {
+        statsJob?.cancel()
+    }
+
+    private fun saveCompletedRide() {
+        val state = _uiState.value
         viewModelScope.launch {
             try {
                 completedRideDao.insertCompletedRide(
-                    com.siaka.data.local.CompletedRide(
-                        distanceKm = currentState.totalDistanceCoveredKm,
-                        durationSeconds = currentState.elapsedTimeSeconds,
-                        avgSpeedKmh = avgSpeed
+                    CompletedRide(
+                        distanceKm = state.totalDistanceCoveredKm,
+                        durationSeconds = state.elapsedTimeSeconds,
+                        avgSpeedKmh = state.averageSpeedKmh,
+                        timestamp = System.currentTimeMillis()
                     )
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving completed ride", e)
             }
         }
-
-        _uiState.update { 
-            it.copy(
-                isNavigating = false,
-                generatedRoutePoints = emptyList(),
-                routeSteps = emptyList(),
-                isRouteGenerated = false,
-                showSummaryDialog = true,
-                lastRideDistanceKm = currentState.totalDistanceCoveredKm,
-                lastRideDurationSeconds = currentState.elapsedTimeSeconds,
-                lastRideAvgSpeedKmh = avgSpeed
-            ) 
-        }
-        lastTrackedLocation = null
     }
 
-    fun onDismissSummary() {
+    fun dismissSummary() {
         _uiState.update { it.copy(showSummaryDialog = false) }
+        clearRoute()
     }
 
     fun clearRoute() {
@@ -272,70 +162,66 @@ class MapViewModel @Inject constructor(
                 generatedRoutePoints = emptyList(),
                 routeSteps = emptyList(),
                 isRouteGenerated = false,
-                isNavigating = false
-            )
+                distanceInput = ""
+            ) 
         }
     }
 
-    fun saveRoute() {
-        val points = _uiState.value.generatedRoutePoints
-        val steps = _uiState.value.routeSteps
-        val distance = _uiState.value.remainingDistanceKm
-        val duration = _uiState.value.estimatedTimeMinutes
-        val routeName = _uiState.value.routeNameInput.ifEmpty { "My Ride" }
+    fun showSaveRouteDialog() {
+        _uiState.update { it.copy(showSaveRouteDialog = true) }
+    }
 
-        if (points.isNotEmpty()) {
-            _uiState.update { it.copy(isSaving = true) }
-            viewModelScope.launch {
-                try {
-                    val savedRoute = SavedRoute(
-                        distanceKm = distance,
-                        durationMinutes = duration,
+    fun dismissSaveRouteDialog() {
+        _uiState.update { it.copy(showSaveRouteDialog = false, routeNameInput = "") }
+    }
+
+    fun onRouteNameChange(name: String) {
+        _uiState.update { it.copy(routeNameInput = name) }
+    }
+
+    fun saveRoute() {
+        val name = _uiState.value.routeNameInput
+        val points = _uiState.value.generatedRoutePoints
+        if (name.isBlank() || points.isEmpty()) return
+
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            try {
+                routeDao.insertRoute(
+                    SavedRoute(
+                        name = name,
+                        distanceKm = _uiState.value.totalRouteDistanceKm,
+                        durationMinutes = _uiState.value.estimatedTimeMinutes,
                         points = points,
-                        steps = steps,
-                        name = routeName
+                        steps = _uiState.value.routeSteps,
+                        timestamp = System.currentTimeMillis()
                     )
-                    routeDao.insertRoute(savedRoute)
-                    Log.d(TAG, "Route saved successfully to database")
-                    _uiState.update { 
-                        it.copy(
-                            snackbarMessage = "Route saved successfully!",
-                            showSaveRouteDialog = false,
-                            isSaving = false
-                        ) 
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error saving route", e)
-                    _uiState.update { 
-                        it.copy(
-                            snackbarMessage = "Failed to save route",
-                            isSaving = false
-                        ) 
-                    }
-                }
+                )
+                dismissSaveRouteDialog()
+                _uiState.update { it.copy(isSaving = false, snackbarMessage = "Route saved successfully") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving route", e)
+                _uiState.update { it.copy(isSaving = false, snackbarMessage = "Failed to save route") }
             }
         }
     }
 
     fun loadSavedRoute(routeId: Long) {
+        _uiState.update { it.copy(isLoadingRoute = true) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingRoute = true) }
             try {
                 val route = routeDao.getRouteById(routeId)
                 if (route != null) {
-                    _uiState.update {
+                    _uiState.update { 
                         it.copy(
                             generatedRoutePoints = route.points,
                             routeSteps = route.steps,
                             isRouteGenerated = true,
-                            remainingDistanceKm = route.distanceKm,
+                            totalRouteDistanceKm = route.distanceKm,
                             estimatedTimeMinutes = route.durationMinutes,
-                            remainingMinutes = route.durationMinutes,
-                            isLoadingRoute = false,
-                            shouldCenterOnLocation = true
+                            isLoadingRoute = false
                         )
                     }
-                    Log.d(TAG, "Loaded saved route: ${route.name}")
                 } else {
                     _uiState.update { it.copy(isLoadingRoute = false, error = "Route not found") }
                 }
@@ -346,65 +232,70 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    fun onSnackbarDismissed() {
+    fun clearSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
     fun generateRoute() {
+        Log.i(TAG, "==== GENERATE BUTTON CLICKED ====")
         val currentUserLocation = _uiState.value.userLocation ?: run {
-            Log.e(TAG, "Cannot generate route: No user location")
+            Log.e(TAG, "GENERATE FAIL: No user location available in state")
+            _uiState.update { it.copy(snackbarMessage = "Waiting for GPS location...") }
             return
         }
         
-        val distanceText = _uiState.value.distanceInput.ifEmpty { "1.4" }
+        val distanceText = _uiState.value.distanceInput
+        Log.i(TAG, "INPUT DISTANCE: '$distanceText'")
+        
         val distance = distanceText.toDoubleOrNull() ?: run {
-            Log.e(TAG, "Cannot generate route: Invalid distance: $distanceText")
+            Log.e(TAG, "GENERATE FAIL: Invalid distance string: '$distanceText'")
+            _uiState.update { it.copy(snackbarMessage = "Please enter a valid number") }
             return
         }
 
-        // Add a small buffer/adjustment to the input distance to be more realistic
-        // Often Mapbox/OSRM finds routes that are slightly longer than the waypoints suggest.
-        // We already have circuityFactor in the generator, but we can also cap or adjust here if needed.
-
-        Log.d(TAG, "Generating route from: ${currentUserLocation.latitude}, ${currentUserLocation.longitude} for ${distance}km")
+        Log.i(TAG, "STARTING ROUTE GENERATION: Center=${currentUserLocation.latitude},${currentUserLocation.longitude}, Distance=${distance}km")
         
         _uiState.update { it.copy(isLoadingRoute = true, error = null) }
 
         viewModelScope.launch {
             try {
-                val routeData = routeGenerator.generateLoopRoute(
+                Log.i(TAG, "CALLING: routeGenerator.generateLoopRoute...")
+                when (val result = routeGenerator.generateLoopRoute(
                     centerPoint = currentUserLocation,
                     targetDistanceKm = distance
-                )
-                
-                if (routeData != null) {
-                    Log.d(TAG, "Route generated with ${routeData.points.size} points and ${routeData.steps.size} steps")
-                    
-                    _uiState.update { 
-                        it.copy(
-                            generatedRoutePoints = routeData.points,
-                            routeSteps = routeData.steps,
-                            isRouteGenerated = routeData.points.isNotEmpty(),
-                            isLoadingRoute = false,
-                            showDistanceDialog = false,
-                            remainingDistanceKm = routeData.totalDistanceKm,
-                            totalRouteDistanceKm = routeData.totalDistanceKm,
-                            estimatedTimeMinutes = routeData.totalDurationMinutes,
-                            remainingMinutes = routeData.totalDurationMinutes,
-                            error = if (routeData.points.isEmpty()) "No route found" else null
-                        )
+                )) {
+                    is com.siaka.data.MapboxRouteGenerator.RouteResult.Success -> {
+                        val routeData = result.data
+                        Log.i(TAG, "SUCCESS: Received routeData: ${routeData.points.size} points")
+                        
+                        _uiState.update { 
+                            it.copy(
+                                generatedRoutePoints = routeData.points,
+                                routeSteps = routeData.steps,
+                                isRouteGenerated = routeData.points.isNotEmpty(),
+                                isLoadingRoute = false,
+                                showDistanceDialog = false,
+                                remainingDistanceKm = routeData.totalDistanceKm,
+                                totalRouteDistanceKm = routeData.totalDistanceKm,
+                                estimatedTimeMinutes = routeData.totalDurationMinutes,
+                                remainingMinutes = routeData.totalDurationMinutes,
+                                snackbarMessage = if (routeData.points.isEmpty()) "No route found for this area" else "Route generated!"
+                            )
+                        }
                     }
-                } else {
-                    _uiState.update { 
-                        it.copy(isLoadingRoute = false, error = "No route found")
+                    is com.siaka.data.MapboxRouteGenerator.RouteResult.Error -> {
+                        Log.e(TAG, "FAIL: ${result.message}")
+                        _uiState.update { 
+                            it.copy(isLoadingRoute = false, snackbarMessage = result.message)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Route generation failed", e)
+                Log.e(TAG, "CRITICAL EXCEPTION in generateRoute", e)
                 _uiState.update { 
                     it.copy(
-                        isLoadingRoute = false,
-                        error = e.message ?: "Unknown error"
+                        isLoadingRoute = false, 
+                        snackbarMessage = "System error: ${e.message}"
                     )
                 }
             }
@@ -414,5 +305,6 @@ class MapViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         locationJob?.cancel()
+        statsJob?.cancel()
     }
 }
