@@ -1,10 +1,10 @@
-# Siaka 
+# CyclePath
 
 A Kotlin Android app where cyclists input their desired kilometers and receive randomized cycling routes displayed on an interactive map.
 
 ## 📋 Overview
 
-Siaka helps cyclists discover new paths by generating randomized loop routes based on a target distance. Whether you want a quick 5km sprint or a 50km endurance ride, Siaka crafts a unique route starting and ending at your current location.
+CyclePath helps cyclists discover new paths by generating randomized loop routes based on a target distance. Whether you want a quick 5km sprint or a 50km endurance ride, CyclePath crafts a unique route starting from your current location, ensuring variety in every ride.
 
 ## 🛠 Tech Stack
 
@@ -44,7 +44,6 @@ The app requests the following permissions to provide a seamless experience:
 - Advanced turn-by-turn voice navigation
 - Route sharing with other cyclists
 - Weather integration
-
 
 ## 👤 Author
 
