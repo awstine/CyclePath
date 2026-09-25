@@ -12,7 +12,7 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth
 ) {
-    private val _currentUser = MutableStateFlow<FirebaseUser?>(firebaseAuth.currentUser)
+    private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser
 
     init {
@@ -41,6 +41,20 @@ class AuthRepository @Inject constructor(
 
     fun logout() {
         firebaseAuth.signOut()
+    }
+
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> = try {
+        firebaseAuth.sendPasswordResetEmail(email).await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun deleteCurrentAccount(): Result<Unit> = try {
+        firebaseAuth.currentUser?.delete()?.await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     fun isUserLoggedIn(): Boolean {

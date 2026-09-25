@@ -12,12 +12,15 @@ data class MapboxRouteResponse(
     @SerializedName("waypoints") val waypoints: List<MapboxWaypoint>?
 )
 
+//The path
 data class MapboxRoute(
     @SerializedName("distance") val distance: Double,
     @SerializedName("duration") val duration: Double,
     @SerializedName("geometry") val geometry: String, // Encoded polyline
     @SerializedName("legs") val legs: List<MapboxLeg>?
 )
+
+//The start and stop
 
 data class MapboxLeg(
     @SerializedName("distance") val distance: Double,
@@ -26,6 +29,7 @@ data class MapboxLeg(
     @SerializedName("steps") val steps: List<MapboxStep>?
 )
 
+//The directions (go for 2km)
 data class MapboxStep(
     @SerializedName("distance") val distance: Double,
     @SerializedName("duration") val duration: Double,
@@ -34,6 +38,7 @@ data class MapboxStep(
     @SerializedName("maneuver") val maneuver: MapboxManeuver
 )
 
+//Directions like (Turn left,Turn right)
 data class MapboxManeuver(
     @SerializedName("instruction") val instruction: String,
     @SerializedName("type") val type: String,
@@ -52,6 +57,6 @@ interface MapboxRoutingService {
         @Query("access_token") accessToken: String,
         @Query("geometries") geometries: String = "polyline6",
         @Query("overview") overview: String = "full",
-        @Query("steps") steps: Boolean = true
+        @Query("steps") steps: Boolean = true //List of all turns we need to make
     ): Response<MapboxRouteResponse>
 }

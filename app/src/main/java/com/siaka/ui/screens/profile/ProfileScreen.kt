@@ -80,7 +80,7 @@ fun ProfileScreen(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
             uri?.let {
-                viewModel.updateProfileImage(it.toString())
+                viewModel.uploadProfileImage(it)
             }
             scope.launch { sheetState.hide() }.invokeOnCompletion {
                 if (!sheetState.isVisible) {
@@ -236,7 +236,7 @@ fun ProfileScreen(
                 )
             },
             onRemoveImage = {
-                viewModel.updateProfileImage("") // Or handle removal logic
+                viewModel.removeProfileImage()
                 scope.launch { sheetState.hide() }.invokeOnCompletion {
                     if (!sheetState.isVisible) {
                         showBottomSheet = false
@@ -471,7 +471,7 @@ sealed class ProfileIcon {
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    SiakaTheme {
+    CyclePathTheme {
         ProfileScreen(
             onNavigateToRideHistory = {},
             onNavigateToSettings = {},

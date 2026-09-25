@@ -1,5 +1,6 @@
 package com.siaka.ui.screens.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,16 +21,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.siaka.ui.screens.profile.ProfileViewModel
 import com.siaka.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onAccountDeleted: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
     var darkModeEnabled by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(true) }
+    var notificationsEnabled by remember { mutableStateOf(false) }
     var locationSharingEnabled by remember { mutableStateOf(true) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -72,7 +81,9 @@ fun SettingsScreen(
                     title = "Dark Mode",
                     subtitle = "Adjust app theme to your preference",
                     checked = darkModeEnabled,
-                    onCheckedChange = { darkModeEnabled = it }
+                    onCheckedChange = {
+                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
                 SettingsClickableItem(
@@ -92,7 +103,9 @@ fun SettingsScreen(
                     title = "Push Notifications",
                     subtitle = "Receive alerts about your rides",
                     checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
+                    onCheckedChange = {
+                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
 
@@ -114,6 +127,13 @@ fun SettingsScreen(
                     subtitle = "How we handle your data",
                     onClick = {}
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.3f))
+                SettingsClickableItem(
+                    icon = Icons.Default.DeleteForever,
+                    title = "Delete Account",
+                    subtitle = "Permanently remove your account and data",
+                    onClick = { showDeleteDialog = true }
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -130,6 +150,31 @@ fun SettingsScreen(
             
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete account?") },
+            text = { Text("This permanently deletes your account and profile data. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteAccount { success, message ->
+                        if (success) onAccountDeleted() else deleteError = message
+                    }
+                }) { Text("Delete", color = DangerRed) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+        )
+    }
+    deleteError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { deleteError = null },
+            title = { Text("Unable to delete account") },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { deleteError = null }) { Text("OK") } }
+        )
     }
 }
 

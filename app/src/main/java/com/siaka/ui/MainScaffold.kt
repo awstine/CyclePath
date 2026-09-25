@@ -112,9 +112,7 @@ fun MainScaffold(
                     onRegisterClick = {
                         navController.navigate(Screen.SignUp.route)
                     },
-                    onForgotPasswordClick = {
-                        // TODO
-                    }
+                    onForgotPasswordClick = authViewModel::sendPasswordReset
                 )
             }
             composable(Screen.SignUp.route) {
@@ -179,9 +177,14 @@ fun MainScaffold(
                 })
             }
             composable(Screen.Settings.route) {
-                SettingsScreen(onBack = {
-                    navController.popBackStack()
-                })
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onAccountDeleted = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
             }
             composable(Screen.HelpSupport.route) {
                 HelpSupportScreen(onBack = {

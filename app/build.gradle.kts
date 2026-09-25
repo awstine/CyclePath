@@ -13,7 +13,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.siaka"
+        applicationId = "com.cyclepath"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -73,6 +73,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
 

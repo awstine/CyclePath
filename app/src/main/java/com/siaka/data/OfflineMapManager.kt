@@ -75,7 +75,7 @@ class OfflineMapManager @Inject constructor() {
         val loadOptions = TileRegionLoadOptions.Builder()
             .geometry(geometry)
             .descriptors(listOf(tilesetDescriptor))
-            .metadata(Value.valueOf("Siaka Offline Map"))
+            .metadata(Value.valueOf("CyclePath Offline Map"))
             .build()
 
         tileStore.loadTileRegion(

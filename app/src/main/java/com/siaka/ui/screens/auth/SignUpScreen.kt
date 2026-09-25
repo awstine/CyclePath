@@ -32,7 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.siaka.ui.theme.DarkNavy
 import com.siaka.ui.theme.Primary
 import com.siaka.ui.theme.PrimaryDark
-import com.siaka.ui.theme.SiakaTheme
+import com.siaka.ui.theme.CyclePathTheme
 
 @Composable
 fun SignUpScreen(
@@ -215,13 +215,13 @@ fun SignUpScreen(
                 }
             }
 
-            AuthDivider(text = "or register with")
-
-            // Social Register
-            SocialAuthButton(
-                text = "Google",
-                onClick = { /* TODO: Google Register */ }
-            )
+//            AuthDivider(text = "or register with")
+//
+//            // Social Register
+//            SocialAuthButton(
+//                text = "Google",
+//                onClick = { /* TODO: Google Register */ }
+//            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -247,7 +247,7 @@ fun SignUpScreen(
 @Preview(showBackground = true)
 @Composable
 fun SignUpScreenPreview() {
-    SiakaTheme {
+    CyclePathTheme {
         SignUpScreen(
             onSignUpSuccess = {},
             onLoginClick = {},

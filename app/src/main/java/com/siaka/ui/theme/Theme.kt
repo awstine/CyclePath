@@ -40,7 +40,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun SiakaTheme(
+fun CyclePathTheme(
     content: @Composable () -> Unit
 ) {
     // Force LightColorScheme regardless of system settings

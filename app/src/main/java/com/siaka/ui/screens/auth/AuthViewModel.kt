@@ -37,12 +37,13 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.Loading
             val result = authRepository.signUp(email, password)
             result.onSuccess { user ->
-                val profileResult = userRepository.createUserProfile(user.uid, fullName, email)
-                if (profileResult.isSuccess) {
-                    _uiState.value = AuthUiState.Success
-                } else {
-                    _uiState.value = AuthUiState.Error("Account created, but failed to save profile name.")
-                }
+                // OPTIMISTIC NAVIGATION:
+                // 1. Fire off the profile creation in the background (Don't wait for it!)
+                // Firestore handles the "offline queueing" automatically.
+                userRepository.createUserProfile(user.uid, fullName, email)
+
+                // 2. Move the user to the next screen IMMEDIATELY
+                _uiState.value = AuthUiState.Success
             }.onFailure { error ->
                 _uiState.value = AuthUiState.Error(error.message ?: "Registration failed")
             }
@@ -52,11 +53,25 @@ class AuthViewModel @Inject constructor(
     fun resetState() {
         _uiState.value = AuthUiState.Idle
     }
+
+    fun sendPasswordReset(email: String) {
+        if (email.isBlank()) {
+            _uiState.value = AuthUiState.Error("Enter your email address first")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.sendPasswordResetEmail(email)
+                .onSuccess { _uiState.value = AuthUiState.PasswordResetSent }
+                .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "Could not send reset email") }
+        }
+    }
 }
 
 sealed class AuthUiState {
     object Idle : AuthUiState()
     object Loading : AuthUiState()
     object Success : AuthUiState()
+    object PasswordResetSent : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }
