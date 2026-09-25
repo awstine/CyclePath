@@ -3,7 +3,9 @@ package com.siaka.data
 data class LocationPoint(
     val latitude: Double,
     val longitude: Double,
-    val bearing: Float? = null
+    val bearing: Float? = null,
+    val accuracyMeters: Float? = null,
+    val speedMps: Float? = null
 )
 
 data class MapUiState(
