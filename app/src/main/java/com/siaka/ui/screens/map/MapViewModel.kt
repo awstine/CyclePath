@@ -32,6 +32,9 @@ class MapViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "MapViewModel"
+        private const val MAX_TRACKING_ACCURACY_METERS = 25f
+        private const val MIN_MOVING_SPEED_MPS = 1.0f // 3.6 km/h
+        private const val MIN_MOVEMENT_DISTANCE_METERS = 8.0
     }
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -41,6 +44,8 @@ class MapViewModel @Inject constructor(
     private var statsJob: Job? = null
     private var hasAutoDownloaded = false
     private var startTimeMillis: Long = 0
+    private var pausedAtMillis: Long? = null
+    private var totalPausedMillis: Long = 0
     private var lastTrackedLocation: LocationPoint? = null
 
     init {
@@ -62,8 +67,33 @@ class MapViewModel @Inject constructor(
         locationJob?.cancel()
         locationJob = viewModelScope.launch {
             locationManager.getLocationUpdates().collect { location ->
-                val point = LocationPoint(location.latitude, location.longitude, location.bearing)
+                val point = LocationPoint(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    bearing = location.bearing,
+                    accuracyMeters = location.accuracy.takeIf { location.hasAccuracy() },
+                    speedMps = location.speed.takeIf { location.hasSpeed() }
+                )
                 _uiState.update { it.copy(userLocation = point) }
+
+                if (_uiState.value.isNavigating) {
+                    val previous = lastTrackedLocation
+                    if (!_uiState.value.isPaused && previous != null) {
+                        val segmentKm = distanceBetween(previous, point)
+                        if (isCredibleMovement(previous, point, segmentKm)) {
+                            _uiState.update { state ->
+                                val distance = state.totalDistanceCoveredKm + segmentKm
+                                val elapsedHours = state.elapsedTimeSeconds / 3600.0
+                                state.copy(
+                                    totalDistanceCoveredKm = distance,
+                                    currentSpeedKmh = if (location.hasSpeed()) location.speed * 3.6 else 0.0,
+                                    averageSpeedKmh = if (elapsedHours > 0) distance / elapsedHours else 0.0
+                                )
+                            }
+                        }
+                    }
+                    lastTrackedLocation = point
+                }
                 
                 // Auto-center on first location if needed
                 if (_uiState.value.shouldCenterOnLocation) {
@@ -102,18 +132,68 @@ class MapViewModel @Inject constructor(
     fun startNavigation() {
         if (_uiState.value.generatedRoutePoints.isEmpty()) return
         
-        _uiState.update { it.copy(isNavigating = true, isPaused = false, elapsedTimeSeconds = 0) }
+        _uiState.update {
+            it.copy(
+                isNavigating = true,
+                isPaused = false,
+                elapsedTimeSeconds = 0,
+                totalDistanceCoveredKm = 0.0,
+                averageSpeedKmh = 0.0,
+                currentSpeedKmh = 0.0
+            )
+        }
         startTimeMillis = System.currentTimeMillis()
+        pausedAtMillis = null
+        totalPausedMillis = 0
+        lastTrackedLocation = _uiState.value.userLocation
         startStatsTracking()
     }
 
     fun stopNavigation() {
-        _uiState.update { it.copy(isNavigating = false, showSummaryDialog = true) }
+        // The stats coroutine only refreshes once per second. Capture the exact
+        // stop time here so the summary does not depend on the last tick.
+        val now = System.currentTimeMillis()
+        val pausedDuration = if (_uiState.value.isPaused) {
+            pausedAtMillis?.let { now - it } ?: 0L
+        } else {
+            0L
+        }
+        val finalElapsedSeconds = maxOf(
+            0L,
+            (now - startTimeMillis - totalPausedMillis - pausedDuration) / 1000L
+        )
+        val distance = _uiState.value.totalDistanceCoveredKm
+        val finalAverageSpeed = if (finalElapsedSeconds > 0L) {
+            distance / (finalElapsedSeconds / 3600.0)
+        } else {
+            0.0
+        }
+
+        _uiState.update {
+            it.copy(
+                isNavigating = false,
+                isPaused = false,
+                elapsedTimeSeconds = finalElapsedSeconds,
+                averageSpeedKmh = finalAverageSpeed,
+                lastRideDistanceKm = distance,
+                lastRideDurationSeconds = finalElapsedSeconds,
+                lastRideAvgSpeedKmh = finalAverageSpeed,
+                showSummaryDialog = true
+            )
+        }
         stopStatsTracking()
+        lastTrackedLocation = null
         saveCompletedRide()
     }
 
     fun togglePause() {
+        val now = System.currentTimeMillis()
+        if (_uiState.value.isPaused) {
+            pausedAtMillis?.let { totalPausedMillis += now - it }
+            pausedAtMillis = null
+        } else {
+            pausedAtMillis = now
+        }
         _uiState.update { it.copy(isPaused = !it.isPaused) }
     }
 
@@ -122,7 +202,9 @@ class MapViewModel @Inject constructor(
         statsJob = viewModelScope.launch {
             while (true) {
                 if (!_uiState.value.isPaused) {
-                    _uiState.update { it.copy(elapsedTimeSeconds = (System.currentTimeMillis() - startTimeMillis) / 1000) }
+                    _uiState.update {
+                        it.copy(elapsedTimeSeconds = elapsedTimeSeconds())
+                    }
                 }
                 kotlinx.coroutines.delay(1000)
             }
@@ -162,7 +244,11 @@ class MapViewModel @Inject constructor(
                 generatedRoutePoints = emptyList(),
                 routeSteps = emptyList(),
                 isRouteGenerated = false,
-                distanceInput = ""
+                distanceInput = "",
+                totalDistanceCoveredKm = 0.0,
+                averageSpeedKmh = 0.0,
+                currentSpeedKmh = 0.0,
+                elapsedTimeSeconds = 0
             ) 
         }
     }
@@ -253,6 +339,11 @@ class MapViewModel @Inject constructor(
             return
         }
 
+        if (!distance.isFinite() || distance <= 0.0 || distance > 100.0) {
+            _uiState.update { it.copy(snackbarMessage = "Enter a distance between 1 and 100 km") }
+            return
+        }
+
         Log.i(TAG, "STARTING ROUTE GENERATION: Center=${currentUserLocation.latitude},${currentUserLocation.longitude}, Distance=${distance}km")
         
         _uiState.update { it.copy(isLoadingRoute = true, error = null) }
@@ -300,6 +391,47 @@ class MapViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun elapsedTimeSeconds(): Long {
+        val currentPause = pausedAtMillis?.let { System.currentTimeMillis() - it } ?: 0L
+        return maxOf(0L, (System.currentTimeMillis() - startTimeMillis - totalPausedMillis - currentPause) / 1000L)
+    }
+
+    /**
+     * GPS coordinates naturally wander while a phone is stationary. Only count
+     * a segment when the fix is accurate, the device reports actual movement,
+     * and the displacement is larger than the expected location uncertainty.
+     */
+    private fun isCredibleMovement(
+        previous: LocationPoint,
+        current: LocationPoint,
+        segmentKm: Double
+    ): Boolean {
+        val currentAccuracy = current.accuracyMeters ?: return false
+        val previousAccuracy = previous.accuracyMeters ?: return false
+        val speedMps = current.speedMps ?: return false
+        val segmentMeters = segmentKm * 1000.0
+        val accuracyThreshold = max(
+            MIN_MOVEMENT_DISTANCE_METERS,
+            max(currentAccuracy, previousAccuracy).toDouble() * 1.25
+        )
+
+        return currentAccuracy <= MAX_TRACKING_ACCURACY_METERS &&
+            previousAccuracy <= MAX_TRACKING_ACCURACY_METERS &&
+            speedMps >= MIN_MOVING_SPEED_MPS &&
+            segmentMeters >= accuracyThreshold &&
+            segmentKm <= 0.2
+    }
+
+    private fun distanceBetween(first: LocationPoint, second: LocationPoint): Double {
+        val earthRadiusKm = 6371.0
+        val dLat = Math.toRadians(second.latitude - first.latitude)
+        val dLon = Math.toRadians(second.longitude - first.longitude)
+        val a = sin(dLat / 2).pow(2) +
+            cos(Math.toRadians(first.latitude)) * cos(Math.toRadians(second.latitude)) *
+            sin(dLon / 2).pow(2)
+        return earthRadiusKm * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
     override fun onCleared() {

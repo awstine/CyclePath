@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +26,25 @@ class UserPreferencesRepository @Inject constructor(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 
+    fun profileImagePath(userId: String): Flow<String?> = context.dataStore.data
+        .map { preferences -> preferences[stringPreferencesKey("profile_image_$userId")] }
+
+    suspend fun setProfileImagePath(userId: String, path: String) {
+        context.dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("profile_image_$userId")] = path
+        }
+    }
+
+    suspend fun clearProfileImagePath(userId: String) {
+        context.dataStore.edit { preferences ->
+            preferences.remove(stringPreferencesKey("profile_image_$userId"))
+        }
+    }
+
     val isOnboardingCompleted: Flow<Boolean> = context.dataStore.data
+        //Map and catch exceptions
+        //If there is an exception, return empty preferences
+        //If there is an IOException, return empty preferences
         .catch { exception ->
             if (exception is IOException) {
                 emit(emptyPreferences())
