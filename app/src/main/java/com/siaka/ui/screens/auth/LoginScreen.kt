@@ -30,13 +30,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.siaka.ui.theme.DarkNavy
 import com.siaka.ui.theme.Primary
 import com.siaka.ui.theme.PrimaryDark
-import com.siaka.ui.theme.SiakaTheme
+import com.siaka.ui.theme.CyclePathTheme
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onRegisterClick: () -> Unit,
-    onForgotPasswordClick: () -> Unit,
+    onForgotPasswordClick: (String) -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     var email by remember { mutableStateOf("") }
@@ -49,6 +49,9 @@ fun LoginScreen(
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
             onLoginSuccess()
+            viewModel.resetState()
+        } else if (uiState is AuthUiState.PasswordResetSent) {
+            Toast.makeText(context, "Password reset email sent", Toast.LENGTH_LONG).show()
             viewModel.resetState()
         } else if (uiState is AuthUiState.Error) {
             Toast.makeText(context, (uiState as AuthUiState.Error).message, Toast.LENGTH_LONG).show()
@@ -71,7 +74,7 @@ fun LoginScreen(
 
             // Logo
             Text(
-                text = "Siaka",
+                text = "CyclePath",
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontWeight = FontWeight.Black,
                     color = PrimaryDark,
@@ -138,7 +141,7 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold,
                         color = Primary
                     ),
-                    modifier = Modifier.clickable { onForgotPasswordClick() }
+                    modifier = Modifier.clickable { onForgotPasswordClick(email) }
                 )
             }
 
@@ -169,13 +172,13 @@ fun LoginScreen(
                 }
             }
 
-            AuthDivider(text = "or sign in with")
-
-            // Social Login
-            SocialAuthButton(
-                text = "Google",
-                onClick = { /* TODO: Google Login */ }
-            )
+//            AuthDivider(text = "or sign in with")
+//
+//            // Social Login
+//            SocialAuthButton(
+//                text = "Google",
+//                onClick = { /* TODO: Google Login */ }
+//            )
 
             //Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.height(32.dp))
@@ -202,7 +205,7 @@ fun LoginScreen(
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
-    SiakaTheme {
+    CyclePathTheme {
         LoginScreen(
             onLoginSuccess = {},
             onRegisterClick = {},

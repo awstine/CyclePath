@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Timer
@@ -121,11 +120,14 @@ fun MapScreen(
     }
 
     LaunchedEffect(Unit) {
-        val hasFineLocation = ContextCompat.checkSelfPermission(
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+            || ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
 
-        if (hasFineLocation) {
+        if (hasLocationPermission) {
             viewModel.onPermissionResult(true)
         } else {
             permissionLauncher.launch(
@@ -214,7 +216,7 @@ fun MapScreenContent(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Siaka",
+                        text = "CyclePath",
                         color = PrimaryDark,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                         modifier = Modifier.fillMaxWidth()
@@ -659,16 +661,6 @@ fun RideSummaryDialog(
                         Text("Close")
                     }
                     
-                    Button(
-                        onClick = { /* Implement sharing */ },
-                        modifier = Modifier.weight(1f).height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryDark)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share")
-                    }
                 }
             }
         }
@@ -1135,7 +1127,7 @@ fun SaveRouteDialog(
 //@Preview(showBackground = true)
 //@Composable
 //fun MapScreenPreview() {
-//    SiakaTheme {
+//    CyclePathTheme {
 //        MapScreenContent(
 //            uiState = MapUiState(
 //                isLocationPermissionGranted = true,

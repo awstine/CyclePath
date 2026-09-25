@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.siaka.data.local.RouteDao
 import com.siaka.data.local.CompletedRideDao
-import com.siaka.data.local.SiakaDatabase
+import com.siaka.data.local.CyclePathDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,23 +17,23 @@ import javax.inject.Singleton
 object AppModule {
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): SiakaDatabase {
+    fun provideDatabase(@ApplicationContext context: Context): CyclePathDatabase {
         return Room.databaseBuilder(
             context,
-            SiakaDatabase::class.java,
+            CyclePathDatabase::class.java,
+            // Preserve the original database file during the app rename.
             "siaka_database"
         )
-            .fallbackToDestructiveMigration()
             .build()
     }
 
     @Provides
-    fun provideRouteDao(database: SiakaDatabase): RouteDao {
+    fun provideRouteDao(database: CyclePathDatabase): RouteDao {
         return database.routeDao()
     }
 
     @Provides
-    fun provideCompletedRideDao(database: SiakaDatabase): CompletedRideDao {
+    fun provideCompletedRideDao(database: CyclePathDatabase): CompletedRideDao {
         return database.completedRideDao()
     }
 }

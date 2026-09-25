@@ -1,4 +1,4 @@
-# Siaka 
+# CyclePath
 
 A Kotlin Android app where cyclists input their desired kilometers and receive randomized cycling routes displayed on an interactive map.
 

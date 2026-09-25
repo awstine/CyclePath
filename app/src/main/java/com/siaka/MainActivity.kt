@@ -8,7 +8,7 @@ import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.siaka.ui.MainScaffold
 import com.siaka.ui.MainViewModel
-import com.siaka.ui.theme.SiakaTheme
+import com.siaka.ui.theme.CyclePathTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            SiakaTheme {
+            CyclePathTheme {
                 MainScaffold(mainViewModel = mainViewModel)
             }
         }

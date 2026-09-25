@@ -25,5 +25,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "siaka"
+rootProject.name = "CyclePath"
 include(":app")
