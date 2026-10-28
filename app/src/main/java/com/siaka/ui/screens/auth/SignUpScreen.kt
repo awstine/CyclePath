@@ -48,6 +48,12 @@ fun SignUpScreen(
     var agreeToTerms by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
+    val canSubmit = fullName.isNotBlank() &&
+            email.isNotBlank() &&
+            password.isNotBlank() &&
+            confirmPassword.isNotBlank() &&
+            agreeToTerms
+
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
@@ -174,14 +180,20 @@ fun SignUpScreen(
 
             // Create Account Button
             Button(
-                onClick = { 
-                    if (password == confirmPassword) {
-                        viewModel.signUp(email, password, fullName)
-                    } else {
-                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                onClick = {
+                    when {
+                        fullName.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() -> {
+                            Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                        }
+                        password != confirmPassword -> {
+                            Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            viewModel.signUp(email, password, fullName)
+                        }
                     }
                 },
-                enabled = uiState !is AuthUiState.Loading && agreeToTerms,
+                enabled = uiState !is AuthUiState.Loading && canSubmit,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
