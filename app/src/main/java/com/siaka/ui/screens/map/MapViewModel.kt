@@ -35,6 +35,7 @@ class MapViewModel @Inject constructor(
         private const val MAX_TRACKING_ACCURACY_METERS = 25f
         private const val MIN_MOVING_SPEED_MPS = 1.0f // 3.6 km/h
         private const val MIN_MOVEMENT_DISTANCE_METERS = 8.0
+        private const val MIN_RIDE_DISTANCE_KM = 0.1
     }
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -57,7 +58,13 @@ class MapViewModel @Inject constructor(
     }
 
     fun onPermissionResult(isGranted: Boolean) {
-        _uiState.update { it.copy(isLocationPermissionGranted = isGranted, isMyLocationEnabled = isGranted) }
+        _uiState.update {
+            it.copy(
+                isLocationPermissionGranted = isGranted,
+                isMyLocationEnabled = isGranted,
+                shouldCenterOnLocation = isGranted
+            )
+        }
         if (isGranted) {
             startLocationUpdates()
         }
@@ -95,11 +102,6 @@ class MapViewModel @Inject constructor(
                     lastTrackedLocation = point
                 }
                 
-                // Auto-center on first location if needed
-                if (_uiState.value.shouldCenterOnLocation) {
-                    _uiState.update { it.copy(shouldCenterOnLocation = false) }
-                }
-
                 // Auto-download offline maps for current area once
                 if (!hasAutoDownloaded) {
                     hasAutoDownloaded = true
@@ -178,12 +180,19 @@ class MapViewModel @Inject constructor(
                 lastRideDistanceKm = distance,
                 lastRideDurationSeconds = finalElapsedSeconds,
                 lastRideAvgSpeedKmh = finalAverageSpeed,
-                showSummaryDialog = true
+                showSummaryDialog = true,
+                snackbarMessage = if (distance < MIN_RIDE_DISTANCE_KM) {
+                    "Ride was not saved because it was shorter than 0.1 km"
+                } else {
+                    null
+                }
             )
         }
         stopStatsTracking()
         lastTrackedLocation = null
-        saveCompletedRide()
+        if (distance >= MIN_RIDE_DISTANCE_KM) {
+            saveCompletedRide()
+        }
     }
 
     fun togglePause() {
