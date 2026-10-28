@@ -164,7 +164,6 @@ fun MapScreenContent(
     val viewportState = rememberMapViewportState {
         setCameraOptions {
             zoom(12.0)
-            center(Point.fromLngLat(36.817223, -1.286389))
         }
     }
 
