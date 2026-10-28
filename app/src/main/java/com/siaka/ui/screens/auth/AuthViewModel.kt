@@ -33,6 +33,11 @@ class AuthViewModel @Inject constructor(
     }
 
     fun signUp(email: String, password: String, fullName: String) {
+        if (email.isBlank() || password.isBlank() || fullName.isBlank()) {
+            _uiState.value = AuthUiState.Error("Please fill in all fields")
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             val result = authRepository.signUp(email, password)
